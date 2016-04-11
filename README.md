@@ -1,6 +1,10 @@
 # ormega
 Easy to use ORM for MySQL with classes generator
 
+## Install with composer
+
+    composer require 4k1r0/ormega:dev-master
+
 ## How to generate classes
 
     require_once __DIR__ . '/../vendor/autoload.php'; // Autoload files using Composer autoload
