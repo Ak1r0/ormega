@@ -319,7 +319,7 @@ class ' . $sClassName . ' {
      * @return array
      * @author ' . __CLASS__ . '
      */
-    public function getArray(){
+    public static function getArray(){
         return array(
             ';
 
