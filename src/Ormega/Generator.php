@@ -13,8 +13,8 @@ require_once __DIR__ . '/DbInterface.php';
  */
 class Generator
 {
-    public $sBasePath = '/var/www/local/testorm';
-    public $sTableFilter = 'careneeds';
+    public $sBasePath = '';
+    public $sTableFilter = '*';
 
     public $sqlQuote = '"';
     public $sqlEscQuote = '\'';
@@ -658,10 +658,9 @@ class ' . $sClassName . ' {
 
         $return = true;
         ';
-
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
 
-            $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
+            $aFK = $this->aKeys[ $sTable ][ $aKey['COLUMN_NAME'] ];
 
             $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
 
