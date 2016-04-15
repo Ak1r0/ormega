@@ -803,7 +803,7 @@ class ' . $sClassName . ' {
         $this->limit(1);
         $aReturn = $this->find();
         
-        return $aReturn[0];
+        return !empty($aReturn[0])? $aReturn[0] : new \\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\'.$sClassName.'();
     }
         
 }';
