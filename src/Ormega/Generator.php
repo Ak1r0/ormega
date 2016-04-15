@@ -805,7 +805,7 @@ class ' . $sClassName . ' {
         $this->limit(1);
         $aReturn = $this->find();
         
-        return !empty($aReturn[0])? $aReturn[0] : new \\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\'.$sClassName.'();
+        return !empty($aReturn[0])? $aReturn[0] : null;
     }
         
 }';
