@@ -478,6 +478,8 @@ class ' . $sClassName . ' {
 
     protected function getMaxLength( array $aCol )
     {
+        $nMaxlength = null;
+
         preg_match('/\(([0-9]+)\)/', $aCol['Type'], $aMatches);
         if ( isset($aMatches[1]) )
             $nMaxlength = (int)$aMatches[1];
