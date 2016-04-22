@@ -573,7 +573,15 @@ class ' . $sClassName . ' {
     {
         $sFuncName = $this->formatPhpFuncName($aCol['Field']);
         $sAttrName = $this->formatPhpAttrName($aCol['Field']);
-        $sType = $this->getPhpType($aCol);
+        $sType     = $this->getPhpType($aCol);
+
+        $sDefault   = '';
+        $sTest      = '!is_' . $sType . '( $' . $sAttrName . ' )';
+
+        if( $this->isNull($aCol) ){
+            $sDefault = ' = null';
+            $sTest = '!is_null( $' . $sAttrName . ' ) && ' . $sTest;
+        }
 
         $php = '
         
@@ -582,9 +590,9 @@ class ' . $sClassName . ' {
      * @throw \InvalidArgumentException
      * @author ' . __CLASS__ . '
      */
-    public function set' . $sFuncName . '( $' . $sAttrName . ' )
+    public function set' . $sFuncName . '( $' . $sAttrName . $sDefault . ' )
     {
-        if( !is_' . $sType . '( $' . $sAttrName . ' ) )
+        if( '.$sTest.' )
             throw new \InvalidArgumentException("Invalid parameter for ".__METHOD__." : (' . $sType . ') excepted ($' . $sAttrName . ') provided");
             
         $this->' . $sAttrName . ' = $' . $sAttrName . ';
@@ -634,8 +642,14 @@ class ' . $sClassName . ' {
             $sAttrName = $this->formatPhpAttrName($aCol['Field']);
             $sType = $this->getPhpType($aCol);
 
+            $sValue = $this->getPhpEscape('$this->' . $sAttrName, $sType);
+
+            if( $this->isNull($aCol) ){
+                $sValue = '".( !is_null($this->' . $sAttrName.')? "'.$sValue.'" : "NULL" )."';
+            }
+
             $aSqlFields[] = '        
-                    `' . $aCol['Field'] . '` = ' . $this->getPhpEscape('$this->' . $sAttrName, $sType);
+                    `' . $aCol['Field'] . '` = ' . $sValue;
         }
 
         $aUpdateWhere = array();
@@ -647,7 +661,7 @@ class ' . $sClassName . ' {
 
         $sqlInsert = 'INSERT INTO ' . $sTable . ' SET ' . implode(',', $aSqlFields);
         $sqlUpdate = 'UPDATE ' . $sTable . ' SET ' . implode(',', $aSqlFields) . ' 
-                WHERE ' . implode(' AND ', $aUpdateWhere);
+                    WHERE ' . implode(' AND ', $aUpdateWhere);
 
         $php = '
         
@@ -938,15 +952,24 @@ class ' . $sClassName . ' {
         $req = \\' . $this->sDirBase . '\Orm::driver()->query($sql);
         while( $aData = \\' . $this->sDirBase . '\Orm::driver()->fetch_assoc($req) ){
             
-            $obj = new \\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\'.$sClassName.'();';
+            $obj = new \\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\'.$sClassName.'();
+            ';
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
 
             $sFuncName = $this->formatPhpFuncName($aCol['Field']);
             $sType = $this->getPhpType($aCol);
 
-            $php .= '
-            $obj->set' . $sFuncName . '((' . $sType . ') $aData["' . $aCol['Field'] . '"]);';
+            if( $this->isNull($aCol) ){
+                 $php .= '
+                if( !is_null($aData["' . $aCol['Field'] . '"]) ){
+                    $obj->set' . $sFuncName . '((' . $sType . ') $aData["' . $aCol['Field'] . '"]);
+                }
+                ';
+            } else {
+                $php .= '$obj->set' . $sFuncName . '((' . $sType . ') $aData["' . $aCol['Field'] . '"]);
+                ';
+            }
         }
 
         $php .= '
@@ -1033,9 +1056,33 @@ class ' . $sClassName . ' {
         }
     }
 
+    /**
+     * Is $aCol an unsigned field ?
+     *
+     * @param array $aCol Column info from "SHOW COLUMNS" request
+     *
+     * @return bool
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
     protected function isUnsigned( array $aCol )
     {
         return strpos($aCol['Type'], 'unsigned') !== false;
+    }
+
+    /**
+     * Is NULL allowed for a column ?
+     *
+     * @param array $aCol Field info from "SHOW COLUMNS" request
+     *
+     * @return bool
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
+    protected function isNull( array $aCol )
+    {
+        if( isset($aCol['Null']) && $aCol['Null'] == 'YES') return true;
+        else return false;
     }
 
     /* @TODO load in the Query generated class
