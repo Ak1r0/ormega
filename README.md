@@ -1,16 +1,18 @@
 # ormega
-Easy to use ORM for MySQL with classes generator
+Basic ORM for MySQL with classes generator
+
+# Non CodeIgniter projects
 
 ## Install with composer
 
-    composer require 4k1r0/ormega:dev-master
+    composer require 4k1r0/ormega:1.0.0
 
 ## How to generate classes
 
 ```php
 require_once __DIR__ . '/../vendor/autoload.php'; // Autoload files using Composer autoload
 
-require_once 'myApp/adapter/Db.php'; // Include your mysql adapter
+require_once 'myApp/adapter/Db.php'; // Include your mysql adapter, it must extends the ormega\DbInterface
 
 $db = new Db('database', '127.0.0.1', 'root', '');
 
