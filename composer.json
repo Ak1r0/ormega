@@ -1,6 +1,6 @@
 {
     "name": "4k1r0/ormega",
-    "type": "library",
+    "type": "codeigniter-third-party",
     "version": "1.0.0",
     "description": "Easy to use ORM",
     "authors": [
@@ -11,11 +11,15 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "php": ">=5.3.0"
+        "php": ">=5.3.0",
+        "composer/installers": "1.0.*"
     },
     "autoload": {
         "psr-0": {
             "Ormega": "src/"
         }
+    },
+    "extra": {
+        "installer-name": "ormega"
     }
 }
