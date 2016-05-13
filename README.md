@@ -1,8 +1,6 @@
 # ormega
 Basic ORM for MySQL with classes generator
 
-# Non CodeIgniter projects
-
 ## Install with composer
 
     composer require 4k1r0/ormega:1.0.0

@@ -159,6 +159,10 @@ class Orm {
     const OPERATOR_LOWEREQUALS_THAN = "<=";
     const OPERATOR_EQUALS = "=";
     const OPERATOR_IN = "IN";
+    const OPERATOR_NOTIN = "NOT IN";
+    const OPERATOR_PC_LIKE_PC = "%LIKE%";
+    const OPERATOR_PC_LIKE = "%LIKE";
+    const OPERATOR_LIKE_PC = "LIKE%";
     const ORDER_ASC = "ASC";
     const ORDER_DESC = "DESC";
     
@@ -183,7 +187,7 @@ class Orm {
      * @param \Ormega\DbInterface $db Database interface
      * @return void
      */
-    public static function init(\Ormega\DbInterface $db){
+    public static function init(CI_DB $db){
 
         self::$db = $db;
 
@@ -637,31 +641,12 @@ class ' . $sClassName . ' {
 
     protected function genSave( $sTable )
     {
-        $aSqlFields = array();
-        foreach ( $this->aCols[ $sTable ] as $aCol ) {
-            $sAttrName = $this->formatPhpAttrName($aCol['Field']);
-            $sType = $this->getPhpType($aCol);
-
-            $sValue = $this->getPhpEscape('$this->' . $sAttrName, $sType);
-
-            if( $this->isNull($aCol) ){
-                $sValue = '".( !is_null($this->' . $sAttrName.')? "'.$sValue.'" : "NULL" )."';
-            }
-
-            $aSqlFields[] = '        
-                    `' . $aCol['Field'] . '` = ' . $sValue;
-        }
-
         $aUpdateWhere = array();
         foreach ( $this->aPrimaryKeys[ $sTable ] as $aPrimaryKey ) {
             $sPrimaryName = $aPrimaryKey['COLUMN_NAME'];
             $sPrimaryPhpName = $this->formatPhpAttrName($sPrimaryName);
             $aUpdateWhere[] = $sPrimaryName . ' = ' . $this->sqlEscQuote . $this->sqlQuote . '.$this->' . $sPrimaryPhpName . '.' . $this->sqlQuote . $this->sqlEscQuote;
         }
-
-        $sqlInsert = 'INSERT INTO ' . $sTable . ' SET ' . implode(',', $aSqlFields);
-        $sqlUpdate = 'UPDATE ' . $sTable . ' SET ' . implode(',', $aSqlFields) . ' 
-                    WHERE ' . implode(' AND ', $aUpdateWhere);
 
         $php = '
         
@@ -684,20 +669,29 @@ class ' . $sClassName . ' {
         $return = $return && $this->' . $sObjAttrName . '->save();';
         }
 
-        $php .= ' 
-        
+        $php .= '          
         if( $this->_isModified && $return ){ 
+        ';
+
+        foreach ( $this->aCols[ $sTable ] as $aCol ) {
+            $sAttrName = $this->formatPhpAttrName($aCol['Field']);
+
+            $sValue = '$this->' . $sAttrName;
+
+            $php .= '
+            \\' . $this->sDirBase . '\Orm::driver()->set('. $this->sqlQuote . $aCol['Field'] . $this->sqlQuote .', ' . $sValue . ');';
+        }
+
+         $php .= ' 
+         
             if( !$this->_isLoadedFromDb ){ 
-                $return = $return && \\' . $this->sDirBase . '\Orm::driver()->query(
-                    ' . $this->sqlQuote . $sqlInsert . $this->sqlQuote . '
-                );
-                $this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver()->getLastId();
+                $return = $return && \\' . $this->sDirBase . '\Orm::driver()->insert('. $this->sqlQuote . $sTable . $this->sqlQuote .'); 
+                $this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver()->insert_id();
                 $this->_isLoadedFromDb = true;
             }
             else {
-                $return = $return && \\' . $this->sDirBase . '\Orm::driver()->query(
-                    ' . $this->sqlQuote . $sqlUpdate . $this->sqlQuote . '
-                );
+                \\' . $this->sDirBase . '\Orm::driver()->where('. $this->sqlQuote . implode(' AND ', $aUpdateWhere) . $this->sqlQuote .');
+                $return = $return && \\' . $this->sDirBase . '\Orm::driver()->update('. $this->sqlQuote . $sTable . $this->sqlQuote .');
             }
             
             if( $return ){ 
@@ -711,9 +705,9 @@ class ' . $sClassName . ' {
         return $php;
     }
 
-    protected function getPhpEscape( $var, $type )
+    protected function getPhpEscape( $var )
     {
-        return $this->sqlEscQuote . $this->sqlQuote . '.\\' . $this->sDirBase . '\Orm::driver()->escape(' . $var . ', "' . $type . '").' . $this->sqlQuote . $this->sqlEscQuote;
+        return $this->sqlQuote . '.\\' . $this->sDirBase . '\Orm::driver()->escape(' . $var . ').' . $this->sqlQuote;
     }
 
     /**
@@ -766,12 +760,7 @@ class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . 
 namespace ' . $this->sDirBase . '\\' . $this->sDirQuery . '\\' . $this->sDirPrivate . ';
 
 class ' . $sClassName . ' {
-
-    protected $aWhere = array();
-    protected $aGroupBy = array();
-    protected $aOrderBy = array();
-    protected $sLimit = "";
-
+    
     /**
      * Get an instance of this class to chain methods 
      *      without have to use "$var = new ' . $sClassName . '()
@@ -795,7 +784,7 @@ class ' . $sClassName . ' {
      * @author '.__CLASS__.'
      */
     public function limit( $limit, $start = 0 ){
-        $this->sLimit = '.$this->sqlQuote.' LIMIT '.$this->sqlQuote.'.$start.'.$this->sqlQuote.','.$this->sqlQuote.'.$limit;
+        \\' . $this->sDirBase . '\Orm::driver()->limit( $limit, $start );
         return $this;
     }
     ';
@@ -845,19 +834,32 @@ class ' . $sClassName . ' {
      * @return \\' . $this->sDirBase . '\\' . $this->sDirQuery . '\\'.$sClassName.'
      * @author '.__CLASS__.'
      */
-    public function filterBy' . $sFuncName . '( $value, $operator = \Ormega\Orm::OPERATOR_EQUALS ){
-        if( $operator == \Ormega\Orm::OPERATOR_IN ){
-            if( is_array($value) ) {
-                array_walk($value, function(&$array, $key){ 
-                    $array[$key] = '.$this->sqlQuote.$this->sqlEscQuote.$this->sqlQuote
-                        .'.\\' . $this->sDirBase . '\Orm::driver()->escape($array[$key])
-                        .'.$this->sqlQuote.$this->sqlEscQuote.$this->sqlQuote.';
-                });
-                $value = implode('.$this->sqlQuote.','.$this->sqlQuote.', $value);
+    public function filterBy' . $sFuncName . '( $value, $operator = \Ormega\Orm::OPERATOR_EQUALS )
+    {
+        if( $operator == \Ormega\Orm::OPERATOR_IN || \Ormega\Orm::OPERATOR_NOTIN ){
+            if( !is_array($value) ) {
+                $value = explode('.$this->sqlQuote.','.$this->sqlQuote.', $value);
             }
-            $this->aWhere[] = '.$this->sqlQuote.'`' . $aCol['Field'] . '` '.$this->sqlQuote.'.$operator.'.$this->sqlQuote.' ('.$this->sqlQuote.'.$value.'.$this->sqlQuote.')'.$this->sqlQuote.';
-        } else {
-            $this->aWhere[] = '.$this->sqlQuote.'`' . $aCol['Field'] . '` '.$this->sqlQuote.'.$operator.'.$this->sqlQuote.' '.$this->sqlQuote.'.\\' . $this->sDirBase . '\Orm::driver()->escape($value);
+        }
+        
+        switch( $operator ){
+            case \Ormega\Orm::OPERATOR_IN:
+                \\' . $this->sDirBase . '\Orm::driver()->where_in(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value);
+                break;
+            case \Ormega\Orm::OPERATOR_NOTIN:
+                \\' . $this->sDirBase . '\Orm::driver()->where_not_in(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value);
+                break;
+            case \Ormega\Orm::OPERATOR_LIKE_PC:
+                \\' . $this->sDirBase . '\Orm::driver()->like(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'after'.$this->sqlQuote.');
+                break;
+            case \Ormega\Orm::OPERATOR_PC_LIKE:
+                \\' . $this->sDirBase . '\Orm::driver()->like(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'before'.$this->sqlQuote.');
+                break;
+            case \Ormega\Orm::OPERATOR_PC_LIKE_PC:
+                \\' . $this->sDirBase . '\Orm::driver()->like(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'both'.$this->sqlQuote.');
+                break;
+            default:
+                \\' . $this->sDirBase . '\Orm::driver()->where( ' . $this->sqlQuote . $aCol['Field'] . ' ' . $this->sqlQuote . '.$operator, $value );
         }
         
         return $this;
@@ -884,8 +886,9 @@ class ' . $sClassName . ' {
      * @return \\' . $this->sDirBase . '\\' . $this->sDirQuery . '\\'.$sClassName.'
      * @author '.__CLASS__.'
      */
-    public function groupBy' . $sFuncName . '(){
-        $this->aGroupBy[] = '.$this->sqlQuote.'`' . $aCol['Field'] . '`'.$this->sqlQuote.';
+    public function groupBy' . $sFuncName . '()
+    {
+        \\' . $this->sDirBase . '\Orm::driver()->group_by('.$this->sqlQuote . $aCol['Field'] . $this->sqlQuote.');
         return $this;
     }';
 
@@ -911,8 +914,9 @@ class ' . $sClassName . ' {
      * @return \\' . $this->sDirBase . '\\' . $this->sDirQuery . '\\'.$sClassName.'
      * @author '.__CLASS__.'
      */
-    public function orderBy' . $sFuncName . '( $order = \Ormega\Orm::ORDER_ASC ){
-        $this->aOrderBy[] = '.$this->sqlQuote.'`' . $aCol['Field'] . '` '.$this->sqlQuote.'.$order;
+    public function orderBy' . $sFuncName . '( $order = \Ormega\Orm::ORDER_ASC )
+    {
+        \\' . $this->sDirBase . '\Orm::driver()->order_by('.$this->sqlQuote . $aCol['Field'] . $this->sqlQuote.', $order);
         return $this;
     }';
 
@@ -927,7 +931,7 @@ class ' . $sClassName . ' {
 
         $aColumns = array();
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
-            $aColumns[] = '`' . $aCol['Field'] . '`';
+            $aColumns[] = $aCol['Field'];
         }
 
         $php = '
@@ -943,14 +947,9 @@ class ' . $sClassName . ' {
 
         $aReturn = array();
 
-        $sql = '.$this->sqlQuote.'SELECT ' . implode(',', $aColumns) . ' FROM ' . $sTable . ' '.$this->sqlQuote.';
-        $sql .= !empty($this->aWhere) ? '.$this->sqlQuote.' WHERE '.$this->sqlQuote.' . implode('.$this->sqlQuote.' AND '.$this->sqlQuote.', $this->aWhere) : '.$this->sqlQuote.''.$this->sqlQuote.';
-        $sql .= !empty($this->aGroupBy) ? '.$this->sqlQuote.' GROUP BY '.$this->sqlQuote.' . implode('.$this->sqlQuote.','.$this->sqlQuote.', $this->aGroupBy) : '.$this->sqlQuote.''.$this->sqlQuote.';
-        $sql .= !empty($this->aOrderBy) ? '.$this->sqlQuote.' ORDER BY '.$this->sqlQuote.' . implode('.$this->sqlQuote.','.$this->sqlQuote.', $this->aOrderBy) : '.$this->sqlQuote.''.$this->sqlQuote.';
-        $sql .= $this->sLimit;
-
-        $req = \\' . $this->sDirBase . '\Orm::driver()->query($sql);
-        while( $aData = \\' . $this->sDirBase . '\Orm::driver()->fetch_assoc($req) ){
+        $query = \\' . $this->sDirBase . '\Orm::driver()->select(' . implode(',', $aColumns) . ')->get(' . $sTable . ');
+        
+        foreach( $query->result() as $row ){
             
             $obj = new \\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\'.$sClassName.'();
             ';
@@ -962,12 +961,13 @@ class ' . $sClassName . ' {
 
             if( $this->isNull($aCol) ){
                  $php .= '
-                if( !is_null($aData["' . $aCol['Field'] . '"]) ){
-                    $obj->set' . $sFuncName . '((' . $sType . ') $aData["' . $aCol['Field'] . '"]);
+                if( !is_null($row->' . $aCol['Field'] . ') ){
+                    $obj->set' . $sFuncName . '((' . $sType . ') $row->' . $aCol['Field'] . ');
                 }
                 ';
             } else {
-                $php .= '$obj->set' . $sFuncName . '((' . $sType . ') $aData["' . $aCol['Field'] . '"]);
+                $php .= '
+                $obj->set' . $sFuncName . '((' . $sType . ') $row->' . $aCol['Field'] . ');
                 ';
             }
         }
