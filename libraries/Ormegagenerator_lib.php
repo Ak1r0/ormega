@@ -54,6 +54,8 @@ class Ormegagenerator_lib
         if( isset($config['table_filter']) )
             $this->sTableFilter = $config['table_filter'];
 
+        if( isset($config['base_path']) ) {}
+            $this->sBasePath = $config['base_path'];
 
         if( isset($config['dir_base']) ) {}
             $this->sDirBase = $config['dir_base'];
@@ -310,10 +312,10 @@ class Orm {
     {
         $sClassName = $this->formatPhpClassName($sTable);
 
-        $req = $this->db->query("SELECT id, label, constant FROM `$sTable`");
+         $query = $this->db->query("SELECT id, label, constant FROM `$sTable`");
 
         $aConstants = array();
-        while ( $aData = $this->db->fetch_assoc($req) ) {
+        foreach ( $query->result_array() as $aData ) {
             $aConstants[] = $aData;
         }
 

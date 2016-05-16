@@ -11,7 +11,10 @@ Basic ORM classes generator for CodeIgniter
 
 Tell CI to autoload vendors' libraries :
 
-In the config.php file set ```$config['composer_autoload'] = FCPATH.'vendor/autoload.php';```
+In the config.php file set
+```php
+$config['composer_autoload'] = FCPATH.'vendor/autoload.php';
+```
 
 ### Create a controller "Ormegagenerator.php"
 
