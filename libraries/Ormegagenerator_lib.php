@@ -11,7 +11,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Ormegagenerator_lib
 {
     public $sBasePath = '';
-    public $sTableFilter = '*';
+    public $sTableFilter = '.*';
 
     public $sqlQuote = '"';
     public $sqlEscQuote = '\'';
@@ -36,14 +36,27 @@ class Ormegagenerator_lib
     /**
      * Generator constructor.
      *
-     * @param \Ormega\DbInterface $db Database connection used for models
-     *                                generation
+     * @param array $config array containing all configs needed
+     *                      'db' => database driver link
+     *                      'table_filter' => regular expression to filter tables for which we want generate models
+     *                      'dir_base' => relative path where to generate models (relative to app root)
      *
      * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
      */
-    public function __construct( )
+    public function __construct( array $config )
     {
-        //$this->db = $db;
+        if( !isset( $config['db'] ) || !is_a($config['db'], 'CI_DB_driver') ){
+            throw new InvalidArgumentException('Instance of CI_DB_driver needed to start the model generator');
+        }
+
+        $this->db = $config['db'];
+
+        if( isset($config['table_filter']) )
+            $this->sTableFilter = $config['table_filter'];
+
+
+        if( isset($config['dir_base']) ) {}
+            $this->sDirBase = $config['dir_base'];
     }
 
     /**
@@ -56,6 +69,9 @@ class Ormegagenerator_lib
     public function run()
     {
         $this->output('Start @ ' . date('Y-m-d H:i:s'));
+
+        $this->output('Config : Filter tables with "'. $this->sTableFilter .'" regular expression');
+        $this->output('Config : Gerenarate models in dir "'. $this->sDirBase .'"');
 
         $this->getTables();
 
@@ -125,8 +141,9 @@ class Ormegagenerator_lib
      */
     protected function getTables()
     {
-        $req = $this->db->query('SHOW TABLES');
-        while ( $aTable = $this->db->fetch_row($req) ) {
+        $query = $this->db->query('SHOW TABLES');
+        foreach( $query->result_array() as $aTable ) {
+            $aTable = array_values($aTable);
             if ( empty($this->sTableFilter) || preg_match('/' . $this->sTableFilter . '/', $aTable[0]) )
                 $this->aTables[] = $aTable[0];
         }
@@ -222,8 +239,8 @@ class Orm {
     protected function getFields( $sTable )
     {
         $this->aCols[ $sTable ] = array();
-        $req = $this->db->query('SHOW COLUMNS FROM ' . $sTable);
-        while ( $aCol = $this->db->fetch_assoc($req) ) {
+        $query = $this->db->query('SHOW COLUMNS FROM `' . $sTable . '`');
+        foreach ( $query->result_array() as $aCol ) {
             $this->aCols[ $sTable ][ $aCol['Field'] ] = $aCol;
         }
     }
@@ -241,17 +258,19 @@ class Orm {
         $this->aPrimaryKeys[ $sTable ] = array();
         $this->aForeignKeys[ $sTable ] = array();
 
-        $req = $this->db->query(
+        $query = $this->db->query(
             "SELECT COLUMN_NAME, CONSTRAINT_NAME, REFERENCED_COLUMN_NAME, REFERENCED_TABLE_NAME
                   FROM information_schema.KEY_COLUMN_USAGE
                   WHERE TABLE_NAME = '$sTable'"
         );
-        while ( $aKey = $this->db->fetch_assoc($req) ) {
-            $this->aKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
-            if ( $aKey['CONSTRAINT_NAME'] == 'PRIMARY' )
-                $this->aPrimaryKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
-            if ( $this->isGenerableForeignKey($sTable, $this->aCols[ $sTable ][ $aKey['COLUMN_NAME'] ]) )
-                $this->aForeignKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
+        foreach ( $query->result_array() as $aKey ) {
+            if( isset($this->aCols[ $sTable ][ $aKey['COLUMN_NAME'] ]) ) {
+                $this->aKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
+                if ( $aKey['CONSTRAINT_NAME'] == 'PRIMARY' )
+                    $this->aPrimaryKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
+                if ( $this->isGenerableForeignKey($sTable, $this->aCols[ $sTable ][ $aKey['COLUMN_NAME'] ]) )
+                    $this->aForeignKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
+            }
         }
     }
 
@@ -291,7 +310,7 @@ class Orm {
     {
         $sClassName = $this->formatPhpClassName($sTable);
 
-        $req = $this->db->query("SELECT id, label, constant FROM $sTable");
+        $req = $this->db->query("SELECT id, label, constant FROM `$sTable`");
 
         $aConstants = array();
         while ( $aData = $this->db->fetch_assoc($req) ) {
@@ -1023,7 +1042,7 @@ class ' . $sClassName . ' {
 
         foreach ( $this->aFiles as $aFile ) {
 
-            $this->createFile($this->sBasePath . '/' . $aFile['file'], $aFile['content'], $aFile['erase']);
+            $this->createFile($sRealBasePath . '/' . $aFile['file'], $aFile['content'], $aFile['erase']);
         }
     }
 

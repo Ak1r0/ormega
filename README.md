@@ -1,27 +1,58 @@
 # ormega
-Basic ORM for MySQL with classes generator
+Basic ORM classes generator for CodeIgniter
 
 ## Install with composer
 
-    composer require 4k1r0/ormega:1.0.0
+    composer require 4k1r0/ormega:dev-CI
 
 ## How to generate classes
 
+### Config
+
+Tell CI to autoload vendors' libraries :
+
+In the config.php file set ```$config['composer_autoload'] = FCPATH.'vendor/autoload.php';```
+
+### Create a controller "Ormegagenerator.php"
+
 ```php
-require_once __DIR__ . '/../vendor/autoload.php'; // Autoload files using Composer autoload
+class Ormegagenerator extends MY_Controller {
 
-require_once 'myApp/adapter/Db.php'; // Include your mysql adapter, it must extends the ormega\DbInterface
+    /**
+     * Step constructor
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     * @return void
+     */
+    public function __construct() {
+        parent::__construct();
+    }
 
-$db = new Db('database', '127.0.0.1', 'root', '');
+    /**
+     * Méthode du contrôleur qui va récupérer
+     * de quoi remplir le filtre de recherche des affaires
+     * dans l'étape et charger la vue
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     * @return void
+     */
+    public function index()
+    {
+        $config = array(
+            'db' => $this->db_mpq,
+            'table_filter' => '.*',
+            'dir_base' => 'application/models/Ormega'
+        );
 
-try {
-    $gen = new \Ormega\Generator($db);
-    $gen->sTableFilter = "^user.*"; // regex filter on table's name to generate classes only for specifics tables
-    $gen->sBasePath = "myApp/generatedClasses"; // define where to save generated files - this folder must already exists
-    $gen->run();
-}
-catch (Exception $e){
-    echo $e->getMessage();
+        try {
+            $this->load->add_package_path(APPPATH . 'third_party/ormega');
+            $this->load->library('Ormegagenerator_lib', $config, 'Ormegagen');
+            $this->load->remove_package_path(APPPATH . 'third_party/ormega');
+
+            $this->Ormegagen->run();
+        }
+        catch(InvalidArgumentException $e){
+            echo $e->getMessage();
+        }
+    }
 }
 ```
 
