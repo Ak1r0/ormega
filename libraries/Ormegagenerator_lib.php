@@ -1,8 +1,5 @@
 <?php
-
-namespace Ormega;
-
-require_once __DIR__ . '/DbInterface.php';
+defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
  * Class Ormega\Generator
@@ -11,7 +8,7 @@ require_once __DIR__ . '/DbInterface.php';
  * @category External
  * @version  20160411
  */
-class Generator
+class Ormegagenerator_lib
 {
     public $sBasePath = '';
     public $sTableFilter = '*';
@@ -44,9 +41,9 @@ class Generator
      *
      * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
      */
-    public function __construct( \Ormega\DbInterface $db )
+    public function __construct( )
     {
-        $this->db = $db;
+        //$this->db = $db;
     }
 
     /**
