@@ -280,7 +280,7 @@ class Orm {
         if( isset($aClass[1]) && isset( self::$aDb[ $aClass[1] ] ) )
             return self::$aDb[ $aClass[1] ];
         else
-            return reset(self::$aDb[ $aClass[1] ]);
+            return reset(self::$aDb);
     }
     
     /**
@@ -1279,17 +1279,17 @@ class ' . $sClassName . ' {
 
     protected function formatPhpFuncName( $sName )
     {
-        return str_replace('_', '', ucwords($sName, '_'));
+        return str_replace(array('-','_'), '', ucwords($sName, '_'));
     }
 
     protected function formatPhpForeignFuncName( $sName )
     {
-        return str_replace('_', '', ucwords(substr( $sName, 0, strrpos( $sName, '_' ) ), '_'));
+        return str_replace(array('-','_'), '', ucwords(substr( $sName, 0, strrpos( $sName, '_' ) ), '_'));
     }
 
     protected function formatPhpClassName( $sName )
     {
-        return str_replace('_', '', ucwords($sName, '_'));
+        return str_replace(array('-','_'), '', ucwords($sName, '_'));
     }
 
     protected function formatPhpAttrName( $sName )

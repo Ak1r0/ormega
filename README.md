@@ -75,22 +75,7 @@ class Ormegagenerator extends MY_Controller {
 
 ## How to use generated classes
 
-### Init
-
-```php
-require_once 'myApp/vendor/autoload.php'; // Autoload files using Composer's autoload
-require_once 'myApp/generatedClasses/Orm.php';
-
-[...]
-\Ormega\Orm::init($db);
-```
-
-> `$db` must be an instance of \Ormega\DbInterface (autoloaded with composer)
-> so you have to implement this interface in any mysql adapter used
-
-This will add an autoloader for generated classes.
-
-### Manipulate, insert or update, Select, find
+### Init, Manipulate, insert or update, Select, find
 
 ```php
 // I.E. Into a CI controller
