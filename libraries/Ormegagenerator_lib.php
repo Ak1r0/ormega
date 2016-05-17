@@ -1232,6 +1232,7 @@ class ' . $sClassName . ' {
             case 'timestamp':
             case 'datetime':
             case 'date':
+            case 'enum':
                 $sType = 'string';
                 break;
         }
