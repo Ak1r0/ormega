@@ -102,7 +102,7 @@ class Ormegagenerator_lib
                 $this->getFields($sTable);
                 $this->getKeys($sTable);
 
-                if ( strpos($sTable, 'enum_') === 0 ) {
+                if ( strpos($sTable, 'enum') === 0 ) {
 
                     $this->aFiles[] = array(
                         'file'    => $this->sDirBase . '/' . $this->sDatabase . '/' . $this->sDirEnum . '/' . $this->formatPhpClassName($sTable) . '.php',
@@ -215,6 +215,7 @@ class Ormegagenerator_lib
                 $this->aKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
                 if ( $aKey['CONSTRAINT_NAME'] == 'PRIMARY' )
                     $this->aPrimaryKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
+
                 if ( $this->isGenerableForeignKey($sTable, $this->aCols[ $sTable ][ $aKey['COLUMN_NAME'] ]) )
                     $this->aForeignKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
             }
@@ -225,13 +226,10 @@ class Ormegagenerator_lib
     {
         return
             isset($this->aKeys[ $sTable ][ $aCol['Field'] ])
+            && !empty($this->aKeys[ $sTable ][ $aCol['Field'] ]['REFERENCED_COLUMN_NAME'])
+            && !empty($this->aKeys[ $sTable ][ $aCol['Field'] ]['REFERENCED_TABLE_NAME'])
             && !isset($this->aPrimaryKeys[ $sTable ][ $aCol['Field'] ])
-            && strpos($aCol['Field'], 'enum_') === false;
-    }
-
-    protected function formatPhpClassName( $sName )
-    {
-        return str_replace('_', '', ucwords($sName, '_'));
+            && strpos($aCol['Field'], 'enum') === false;
     }
 
     /**
@@ -330,9 +328,9 @@ class Orm {
     }
 
     /**
-     * Gen code for specifics table beginning with "enum_" in is name
+     * Gen code for specifics table beginning with "enum" in is name
      * This classe will only content CONSTANTS
-     * The "enum_" table must contains 3 fields :
+     * The "enum" table must contains 3 fields :
      *      - id
      *      - label
      *      - constant
@@ -521,7 +519,8 @@ class ' . $sClassName . ' {
         return $php;
     }
 
-    protected function genConstructor($sClassName, $sTable){
+    protected function genConstructor($sClassName, $sTable)
+    {
         $aAttrs = $aAttrSigns = array();
         foreach ( $this->aPrimaryKeys[ $sTable ] as $sPrimaryKey => $aPK ) {
             $sAttr = $this->formatPhpAttrName( $aPK['COLUMN_NAME'] );
@@ -573,12 +572,10 @@ class ' . $sClassName . ' {
 
     public function genForeignAttribute( $sTable, array $aCol )
     {
-
         $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
+        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
-
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($sObjAttrName);
+        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $php = '
     /**
@@ -611,13 +608,12 @@ class ' . $sClassName . ' {
 
     public function genGetterForeignKey( $sTable, array $aCol )
     {
-
         $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
 
-        $sObjFuncName = $this->formatPhpFuncName($aFK['REFERENCED_TABLE_NAME']);
-        $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
+        $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
+        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($sObjAttrName);
+        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $php = '
     
@@ -664,8 +660,8 @@ class ' . $sClassName . ' {
 
         if( isset($this->aForeignKeys[ $sTable ][ $aCol['Field'] ]) ){
             $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
-            $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
-            $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($sObjAttrName);
+            $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
+            $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
             $php .= '$this->' . $sObjAttrName . ' = new '.$sType.'($' . $sAttrName . ');
             ';
@@ -684,10 +680,10 @@ class ' . $sClassName . ' {
     {
         $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
 
-        $sObjFuncName = $this->formatPhpFuncName($aFK['REFERENCED_TABLE_NAME']);
-        $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
+        $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
+        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($sObjAttrName);
+        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $sAttrName = $this->formatPhpAttrName($aCol['Field']);
         $sReferencedAttr = $this->formatPhpFuncName($aFK['REFERENCED_COLUMN_NAME']);
@@ -732,15 +728,14 @@ class ' . $sClassName . ' {
         ';
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
 
-            $aFK = $this->aKeys[ $sTable ][ $aKey['COLUMN_NAME'] ];
-
-            $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
+            $sObjAttrName = $this->formatPhpForeignAttrName( $aKey['COLUMN_NAME'] );
 
             $php .= '
         $return = $return && (!$this->' . $sObjAttrName . ' || $this->' . $sObjAttrName . '->save());';
         }
 
-        $php .= '          
+        $php .= '
+        
         if( $this->_isModified && $return ){ 
         ';
 
@@ -1162,11 +1157,6 @@ class ' . $sClassName . ' {
         else return false;
     }
 
-    protected function formatPhpAttrName( $sName )
-    {
-        return $sName;
-    }
-
     protected function getPhpType( $aCol )
     {
         preg_match('/^([a-z]+)/', $aCol['Type'], $aMatches);
@@ -1227,6 +1217,35 @@ class ' . $sClassName . ' {
     protected function formatPhpFuncName( $sName )
     {
         return str_replace('_', '', ucwords($sName, '_'));
+    }
+
+    protected function formatPhpForeignFuncName( $sName )
+    {
+        return str_replace('_', '', ucwords(substr( $sName, 0, strrpos( $sName, '_' ) ), '_'));
+    }
+
+    protected function formatPhpClassName( $sName )
+    {
+        return str_replace('_', '', ucwords($sName, '_'));
+    }
+
+    protected function formatPhpAttrName( $sName )
+    {
+        return $sName;
+    }
+
+    /**
+     * Return the name of the attribute without the characters after the last underscore (_)
+     *
+     * @param string $name
+     *
+     * @return string
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
+    protected function formatPhpForeignAttrName( $sName )
+    {
+        return substr( $sName, 0, strrpos( $sName, '_' ) );
     }
 
     /* @TODO load in the Query generated class
