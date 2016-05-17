@@ -937,7 +937,7 @@ class ' . $sClassName . ' {
      */
     public function filterBy' . $sFuncName . '( $value, $operator = \Ormega\Orm::OPERATOR_EQUALS )
     {
-        if( $operator == \Ormega\Orm::OPERATOR_IN || \Ormega\Orm::OPERATOR_NOTIN ){
+        if( $operator == \Ormega\Orm::OPERATOR_IN || $operator == \Ormega\Orm::OPERATOR_NOTIN ){
             if( !is_array($value) ) {
                 $value = explode('.$this->sqlQuote.','.$this->sqlQuote.', $value);
             }
@@ -1048,7 +1048,7 @@ class ' . $sClassName . ' {
 
         $aReturn = array();
 
-        $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->select(' . implode(',', $aColumns) . ')->get(' . $sTable . ');
+        $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->select("' . implode(',', $aColumns) . '")->get("' . $sTable . '");
         
         foreach( $query->result() as $row ){
             

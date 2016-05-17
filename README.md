@@ -109,7 +109,7 @@ public function test(){
 
         # Manipulate, insert or update
 
-        $comment = new Ormega\Mpq\Entity\Comment();
+        $comment = new Ormega\Db_1\Entity\Comment();
         $comment
             ->setQualitycaseId(1919)
             ->setFormblockId(4)
@@ -121,7 +121,7 @@ public function test(){
 
         # Select, find
 
-        $aCareneeds = \Ormega\Query\Careneeds::create()
+        $aCareneeds = \Ormega\Db_1\Careneeds::create()
             ->filterByAge(20)
             ->orderByDateinsert('DESC')
             ->find();
