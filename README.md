@@ -90,7 +90,7 @@ require_once 'myApp/generatedClasses/Orm.php';
 
 This will add an autoloader for generated classes.
 
-### Manipulate, insert or update
+### Manipulate, insert or update, Select, find
 
 ```php
 // I.E. Into a CI controller
@@ -107,6 +107,8 @@ public function test(){
 
         Ormega\Orm::init($aInit);
 
+        # Manipulate, insert or update
+
         $comment = new Ormega\Mpq\Entity\Comment();
         $comment
             ->setQualitycaseId(1919)
@@ -117,18 +119,16 @@ public function test(){
             ->setMessage('test')
             ->save();
 
+        # Select, find
+
+        $aCareneeds = \Ormega\Query\Careneeds::create()
+            ->filterByAge(20)
+            ->orderByDateinsert('DESC')
+            ->find();
+
     }
     catch( \InvalidArgumentException $e ){
         echo $e->getMessage();
     }
 }
-```
-
-### Select, find
-
-```php
-$aCareneeds = \Ormega\Query\Careneeds::create()
-    ->filterByAge(20)
-    ->orderByDateinsert('DESC')
-    ->find();
 ```
