@@ -348,12 +348,14 @@ class Orm {
      */
     protected function genFileEnum( $sTable )
     {
+        $pattern = '/([^\w])/';
         $sClassName = $this->formatPhpClassName($sTable);
 
         $query = $this->db->query("SELECT id, label, constant FROM `$sTable`");
 
         $aConstants = array();
         foreach ( $query->result_array() as $aData ) {
+            $aData['constant'] = strtoupper( preg_replace($pattern, '', $aData['constant']) );
             $aConstants[] = $aData;
         }
 
@@ -373,13 +375,37 @@ class ' . $sClassName . ' {
         }
 
         $php .= '
-        
+    
+    /**
+     * Get an ID from a string constant
+     * @param string $sConstant
+     * @return int
+     * @author ' . __CLASS__ . '
+     */
+    public static function getId( $sConstant )
+    {
+        switch( $sConstant ){';
+
+        foreach ( $aConstants as $aConstant ) {
+            $php .= '
+            case "'. $aConstant['constant'] .'":
+                return self::'. $aConstant['constant'] .';
+                break;';
+        }
+
+        $php .= '
+            default:
+                return 0;
+        }
+    }
+    
     /**
      * Get all the constants in a array form
      * @return array
      * @author ' . __CLASS__ . '
      */
-    public static function getArray(){
+    public static function getArray()
+    {
         return array(
             ';
 
@@ -731,11 +757,11 @@ class ' . $sClassName . ' {
             $sObjAttrName = $this->formatPhpForeignAttrName( $aKey['COLUMN_NAME'] );
 
             $php .= '
-        $return = $return && (!$this->' . $sObjAttrName . ' || $this->' . $sObjAttrName . '->save());';
+        $return = $return && (!$this->' . $sObjAttrName . ' || $this->' . $sObjAttrName . '->save());
+        ';
         }
 
-        $php .= '
-        
+        $php .= '        
         if( $this->_isModified && $return ){ 
         ';
 
@@ -743,9 +769,18 @@ class ' . $sClassName . ' {
             $sAttrName = $this->formatPhpAttrName($aCol['Field']);
 
             $sValue = '$this->' . $sAttrName;
+            $sSetter = '\\' . $this->sDirBase . '\Orm::driver(__CLASS__)->set('. $this->sqlQuote . $aCol['Field'] . $this->sqlQuote .', ' . $sValue . ');';
 
-            $php .= '
-            \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->set('. $this->sqlQuote . $aCol['Field'] . $this->sqlQuote .', ' . $sValue . ');';
+            if( !$this->isNull($aCol) ){
+                 $php .= '
+            if( !is_null('.$sValue.') ){
+                '.$sSetter.'
+            }';
+            }
+            else {
+                $php .= '
+            '.$sSetter;
+            }
         }
 
          $php .= ' 
@@ -1039,7 +1074,7 @@ class ' . $sClassName . ' {
 
         $php .= '
             $obj->loaded(true);
-            $obj->saved(true);
+            $obj->modified(false);
             
             $aReturn[] = $obj;
         }
@@ -1171,17 +1206,32 @@ class ' . $sClassName . ' {
                     $sType = 'int';
                 }
                 break;
+            case 'smallint':
+            case 'mediumint':
             case 'int':
+            case 'bigint':
+            case 'bit':
                 $sType = 'int';
                 break;
             case 'float':
+            case 'double':
+            case 'decimal':
                 $sType = 'float';
                 break;
             case 'varchar':
-            case 'text':
+            case 'char':
+            case 'varbinary':
             case 'tinytext':
+            case 'text':
+            case 'mediumtext':
+            case 'longtext':
+            case 'tinyblob':
+            case 'blob':
+            case 'mediumblob':
+            case 'longblob':
             case 'timestamp':
             case 'datetime':
+            case 'date':
                 $sType = 'string';
                 break;
         }
@@ -1198,15 +1248,28 @@ class ' . $sClassName . ' {
             $nMaxlength = (int)$aMatches[1];
         else {
             switch ( $aCol['Type'] ) {
+                case 'date';
+                    $nMaxlength = 10;
+                    break;
                 case 'timestamp':
                 case 'datetime':
                     $nMaxlength = 19;
                     break;
                 case 'tinytext':
+                case 'tinyblob':
                     $nMaxlength = 255;
                     break;
                 case 'text':
+                case 'blob':
                     $nMaxlength = 65000;
+                    break;
+                case 'mediumtext':
+                case 'mediumblob':
+                    $nMaxlength = 16777215;
+                    break;
+                case 'longtext':
+                case 'longblob':
+                    $nMaxlength = 4294967295;
                     break;
             }
         }
