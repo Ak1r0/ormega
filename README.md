@@ -40,9 +40,22 @@ class Ormegagenerator extends MY_Controller {
     public function index()
     {
         $config = array(
-            'db' => $this->db_mpq,
-            'table_filter' => '.*',
-            'dir_base' => 'application/models/Ormega'
+            'databases' => array(
+                'mpq' => array(
+                    'db' => $this->db_1, // CI Database connection 1
+                    'filter' => '.*', // Generate files for all tables
+                ),
+                'backend' => array(
+                    'db' => $this->db_2,  // CI Database connection 2 (if multiple databases used)
+                    'filter' => '^(table1|table2|table3|table4)$',
+                ),
+                'gestrh' => array(
+                    'db' => $this->db_3, // CI Database connection 3 (if multiple databases used)
+                    'filter' => '^table_x_.+',
+                )
+            ),
+            'path'      => 'application/models/',
+            'namespace' => 'Ormega'
         );
 
         try {
@@ -80,11 +93,35 @@ This will add an autoloader for generated classes.
 ### Manipulate, insert or update
 
 ```php
-$oCareneeds = new \Ormega\Entity\User();
-$oCareneeds->setEmail('test@gmail.com')
-           ->setAge(20)
-           ->setEmailPublic(true)
-           ->save();
+// I.E. Into a CI controller
+
+public function test(){
+
+    try {
+        $aInit = array(
+            'mpq'     => $this->db_mpq,
+            'backend' => $this->db_backend,
+        );
+
+        require APPPATH . '/models/Ormega/Orm.php';
+
+        Ormega\Orm::init($aInit);
+
+        $comment = new Ormega\Mpq\Entity\Comment();
+        $comment
+            ->setQualitycaseId(1919)
+            ->setFormblockId(4)
+            ->setStepId(3)
+            ->setUserId(24)
+            ->setGroupby('test')
+            ->setMessage('test')
+            ->save();
+
+    }
+    catch( \InvalidArgumentException $e ){
+        echo $e->getMessage();
+    }
+}
 ```
 
 ### Select, find
