@@ -490,6 +490,7 @@ class ' . $sClassName . ' {
         }
 
         $php .= $this->genConstructor($sClassName, $sTable);
+        $php .= $this->genLoader($sClassName, $sTable);
         $php .= '
         
     /**
@@ -554,6 +555,11 @@ class ' . $sClassName . ' {
             $aAttrSigns[] = '$' . $sAttr . ' = null';
         }
 
+        $aIfLoad = array();
+        foreach ( $aAttrs as $sAttr ) {
+            $aIfLoad[] = '!is_null('.$sAttr.')';
+        }
+
         $php = '
     /**
      * ' . $sClassName . ' constructor
@@ -574,10 +580,54 @@ class ' . $sClassName . ' {
         }
 
         $php .= '
+        
         $this->_isLoadedFromDb  = false;
         $this->_isModified      = false;
+        
+        if( '.implode(' && ', $aIfLoad).' ){ 
+            $this->load();
+        }
     }';
 
+        return $php;
+    }
+
+    /**
+     *
+     *
+     * @param string $sClassName
+     * @param string $sTable
+     *
+     * @return string
+     *
+     * @author Florian Duval <f.duval@santiane.fr>
+     */
+    protected function genLoader($sClassName, $sTable){
+        $sQuery = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirQuery . '\\' . $sClassName;
+        $aAttrs = array();
+        foreach ( $this->aPrimaryKeys[ $sTable ] as $sPrimaryKey => $aPK ) {
+            $aAttrs[] = $aPK['COLUMN_NAME'];
+        }
+        $php = '
+    /**
+     * ' . $sClassName . ' loader
+     * @return void
+     * @author ' . __CLASS__ . '
+     */
+    public function load()
+    {
+        $this = '.$sQuery.'::create()';
+
+        foreach($aAttrs as $sAttr) {
+            $php.='
+            ->filterBy'.$this->formatPhpFuncName($sAttr).'($this->'.$this->formatPhpAttrName( $sAttr ).')';
+        }
+
+        $php.='
+            ->findOne();
+        $this->_isLoadedFromDb  = true;
+        $this->_isModified      = false;
+    }';
         return $php;
     }
 
