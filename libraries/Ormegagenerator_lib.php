@@ -222,6 +222,17 @@ class Ormegagenerator_lib
         }
     }
 
+    /**
+     * Check if a Column is a foreign key
+     * and if we can map it with an Entity object of the referenced table
+     *
+     * @param string $sTable Table name
+     * @param array $aCol Sql column infos
+     *
+     * @return bool
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
     protected function isGenerableForeignKey( $sTable, array $aCol )
     {
         return
@@ -258,6 +269,7 @@ class Orm {
     const OPERATOR_PC_LIKE_PC = "%LIKE%";
     const OPERATOR_PC_LIKE = "%LIKE";
     const OPERATOR_LIKE_PC = "LIKE%";
+    
     const ORDER_ASC = "ASC";
     const ORDER_DESC = "DESC";
     
@@ -267,7 +279,7 @@ class Orm {
     protected static $aDb;
 
      /**
-     * Obtain the database driver set in the init() method
+     * Get the database driver set in the init() method
      *
      * @param string $sClassName Classname of the calling class, used to determine which connection use in case of multiple database connections
      *
@@ -424,7 +436,7 @@ class ' . $sClassName . ' {
     /**
      * Generate the "public" entity class
      * The entity class is made to "emulate" a table in php
-     * Each Entity object represente one row
+     * Each Entity object represent one row
      * This classes are used to save data (insert and update)
      *
      * The "public" file can be freely modified by end user as it's not
@@ -489,8 +501,7 @@ class ' . $sClassName . ' {
             $php .= $this->genForeignAttribute($sTable, $this->aCols[ $sTable ][ $sKeyName ]);
         }
 
-        $php .= $this->genConstructor($sClassName, $sTable);
-        $php .= $this->genLoader($sClassName, $sTable);
+        $php .= $this->genConstructor($sClassName);
         $php .= '
         
     /**
@@ -499,7 +510,7 @@ class ' . $sClassName . ' {
      * @return boolean
      * @author ' . __CLASS__ . '
      */
-    public function loaded($bLoaded = null)
+    public function loaded( $bLoaded = null )
     {
         if (!is_null($bLoaded) && is_bool($bLoaded)) {
             $this->_isLoadedFromDb = $bLoaded;
@@ -514,7 +525,7 @@ class ' . $sClassName . ' {
      * @return boolean
      * @author ' . __CLASS__ . '
      */
-    public function modified($bModified = null)
+    public function modified( $bModified = null )
     {
         if (!is_null($bModified) && is_bool($bModified)) {
             $this->_isModified = $bModified;
@@ -546,88 +557,20 @@ class ' . $sClassName . ' {
         return $php;
     }
 
-    protected function genConstructor($sClassName, $sTable)
+    protected function genConstructor($sClassName)
     {
-        $aAttrs = $aAttrSigns = array();
-        foreach ( $this->aPrimaryKeys[ $sTable ] as $sPrimaryKey => $aPK ) {
-            $sAttr = $this->formatPhpAttrName( $aPK['COLUMN_NAME'] );
-            $aAttrs[] = $sAttr;
-            $aAttrSigns[] = '$' . $sAttr . ' = null';
-        }
-
-        $aIfLoad = array();
-        foreach ( $aAttrs as $sAttr ) {
-            $aIfLoad[] = '!is_null('.$sAttr.')';
-        }
-
         $php = '
     /**
      * ' . $sClassName . ' constructor
-     * @param int|null $nId Primary key Id
      * @return void
      * @author ' . __CLASS__ . '
      */
-    public function __construct('.implode(', ', $aAttrSigns).')
-    {';
-
-        foreach ( $aAttrs as $sAttr ) {
-            $sFuncName = $this->formatPhpFuncName($sAttr);
-            $php .= '
-        if ( $'.$sAttr.' ) {
-            $this->set'.$sFuncName.'($'.$sAttr.');
-        }
-        ';
-        }
-
-        $php .= '
-        
+    public function __construct()
+    {       
         $this->_isLoadedFromDb  = false;
         $this->_isModified      = false;
-        
-        if( '.implode(' && ', $aIfLoad).' ){ 
-            $this->load();
-        }
     }';
 
-        return $php;
-    }
-
-    /**
-     *
-     *
-     * @param string $sClassName
-     * @param string $sTable
-     *
-     * @return string
-     *
-     * @author Florian Duval <f.duval@santiane.fr>
-     */
-    protected function genLoader($sClassName, $sTable){
-        $sQuery = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirQuery . '\\' . $sClassName;
-        $aAttrs = array();
-        foreach ( $this->aPrimaryKeys[ $sTable ] as $sPrimaryKey => $aPK ) {
-            $aAttrs[] = $aPK['COLUMN_NAME'];
-        }
-        $php = '
-    /**
-     * ' . $sClassName . ' loader
-     * @return void
-     * @author ' . __CLASS__ . '
-     */
-    public function load()
-    {
-        $this = '.$sQuery.'::create()';
-
-        foreach($aAttrs as $sAttr) {
-            $php.='
-            ->filterBy'.$this->formatPhpFuncName($sAttr).'($this->'.$this->formatPhpAttrName( $sAttr ).')';
-        }
-
-        $php.='
-            ->findOne();
-        $this->_isLoadedFromDb  = true;
-        $this->_isModified      = false;
-    }';
         return $php;
     }
 
@@ -651,7 +594,10 @@ class ' . $sClassName . ' {
         $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
         $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
+        $sType = '\\' . $this->sDirBase
+            . '\\' . $this->sDatabase
+            . '\\' . $this->sDirEntity
+            . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $php = '
     /**
@@ -689,7 +635,10 @@ class ' . $sClassName . ' {
         $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
         $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
+        $sType = '\\' . $this->sDirBase
+            . '\\' . $this->sDatabase
+            . '\\' . $this->sDirEntity
+            . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $php = '
     
@@ -728,8 +677,9 @@ class ' . $sClassName . ' {
      */
     public function set' . $sFuncName . '( $' . $sAttrName . $sDefault . ' )
     {
-        if( '.$sTest.' )
+        if( '.$sTest.' ) {
             throw new \InvalidArgumentException("Invalid parameter for ".__METHOD__." : (' . $sType . ') excepted ($' . $sAttrName . ') provided");
+         }
             
         $this->' . $sAttrName . ' = $' . $sAttrName . ';
         ';
@@ -737,9 +687,16 @@ class ' . $sClassName . ' {
         if( isset($this->aForeignKeys[ $sTable ][ $aCol['Field'] ]) ){
             $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
             $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
-            $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
+            $sQuery = '\\' . $this->sDirBase
+                . '\\' . $this->sDatabase
+                . '\\' . $this->sDirQuery
+                . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
-            $php .= '$this->' . $sObjAttrName . ' = new '.$sType.'($' . $sAttrName . ');
+            $php .= '$this->' . $sObjAttrName . ' = '
+                .$sQuery.'::create()
+                ->filterBy'.$this->formatPhpFuncName( $aCol['Field'] )
+                .'($'.$this->formatPhpAttrName( $aCol['Field'] ).')
+                ->findOne();
             ';
         }
 
@@ -759,7 +716,10 @@ class ' . $sClassName . ' {
         $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
         $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
+        $sType = '\\' . $this->sDirBase
+            . '\\' . $this->sDatabase
+            . '\\' . $this->sDirEntity
+            . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $sAttrName = $this->formatPhpAttrName($aCol['Field']);
         $sReferencedAttr = $this->formatPhpFuncName($aFK['REFERENCED_COLUMN_NAME']);
@@ -788,7 +748,10 @@ class ' . $sClassName . ' {
         foreach ( $this->aPrimaryKeys[ $sTable ] as $aPrimaryKey ) {
             $sPrimaryName = $aPrimaryKey['COLUMN_NAME'];
             $sPrimaryPhpName = $this->formatPhpAttrName($sPrimaryName);
-            $aUpdateWhere[] = $sPrimaryName . ' = ' . $this->sqlEscQuote . $this->sqlQuote . '.$this->' . $sPrimaryPhpName . '.' . $this->sqlQuote . $this->sqlEscQuote;
+            $aUpdateWhere[] = $sPrimaryName . ' = '
+                . $this->sqlEscQuote . $this->sqlQuote
+                . '.$this->' . $sPrimaryPhpName . '.'
+                . $this->sqlQuote . $this->sqlEscQuote;
         }
 
         $php = '
@@ -914,7 +877,7 @@ class ' . $sClassName . ' {
     
     /**
      * Get an instance of this class to chain methods 
-     *      without have to use "$var = new ' . $sClassName . '()
+     *      without have to use $var = new ' . $sClassName . '()
      *
      * @return \\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirQuery . '\\'.$sClassName.'
      *
@@ -1098,7 +1061,7 @@ class ' . $sClassName . ' {
 
         $aReturn = array();
 
-        $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->select("' . implode(',', $aColumns) . '")->get("' . $sTable . '");
+        $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->select(' . $this->sqlQuote . implode(',', $aColumns) . $this->sqlQuote . ')->get(' . $this->sqlQuote . $sTable . $this->sqlQuote . ');
         
         foreach( $query->result() as $row ){
             
@@ -1209,7 +1172,10 @@ class ' . $sClassName . ' {
         else {
             $sFileExists = $bFileExists ? 'YES' : 'NO';
             $sErase = $erase ? 'YES' : 'NO';
-            $this->output('Gen file "' . $fullFilePath . '" : KO ; File already exists ? ' . $sFileExists . ' ; Overwrite ? ' . $sErase);
+            $this->output(
+                'Gen file "'. $fullFilePath . '" : KO ; File already exists ? '
+                . $sFileExists . ' ; Overwrite ? ' . $sErase
+            );
         }
     }
 
@@ -1361,26 +1327,4 @@ class ' . $sClassName . ' {
     {
         return substr( $sName, 0, strrpos( $sName, '_' ) );
     }
-
-    /* @TODO load in the Query generated class
-     * protected function genLoad( $sTable ){
-     * $sPKName = $this->formatPhpAttrName( $this->aKeys[ $sTable
-     * ]['PRIMARY']['Column_name'] );
-     * $php = '
-     *
-     * public function load(){
-     *
-     * if( !$this->_isLoadedFromDb && $this->'.$sPKName.' ){
-     * $res = \Omega\Orm::driver(__CLASS__)->query(
-     * '.$this->sqlQuote.'SELECT * FROM '.$sTable.' WHERE '.$this->aKeys[
-     * $sTable ]['PRIMARY']['Column_name'].' =
-     * '.$this->getPhpEscape('$this->'.$sPKName, 'int').'
-     * );
-     * $this->_isLoadedFromDb = true;
-     * }
-     * }';
-     *
-     * return $php;
-     * }
-     */
 }
