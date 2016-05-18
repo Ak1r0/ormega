@@ -14,23 +14,26 @@ require_once __DIR__ . '/DbInterface.php';
 class Generator
 {
     public $sBasePath = '';
-    public $sTableFilter = '*';
+    public $sTableFilter = '.*';
 
     public $sqlQuote = '"';
     public $sqlEscQuote = '\'';
 
     public $verbose = true;
 
+    protected $aDb;
     protected $db;
 
-    protected $aTables = array();
-    protected $aCols = array();
-    protected $aKeys = array();
-    protected $aPrimaryKeys = array();
-    protected $aForeignKeys = array();
+    protected $aTables;
+    protected $aCols;
+    protected $aKeys;
+    protected $aPrimaryKeys;
+    protected $aForeignKeys;
     protected $aFiles = array();
 
-    protected $sDirBase = __NAMESPACE__;
+    protected $sDatabase = 'database';
+
+    protected $sDirBase = 'Ormega';
     protected $sDirEntity = 'Entity';
     protected $sDirPrivate = 'Base';
     protected $sDirEnum = 'Enum';
@@ -39,14 +42,34 @@ class Generator
     /**
      * Generator constructor.
      *
-     * @param \Ormega\DbInterface $db Database connection used for models
-     *                                generation
+     * @param array $config array containing all configs needed
+     *                      'db' => database driver link
+     *                      'table_filter' => regular expression to filter tables for which we want generate models
+     *                      'path' => relative path where to generate models (relative to app root)
+     *                      'namespace' => relative path where to generate models (relative to app root)
      *
      * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
      */
-    public function __construct( \Ormega\DbInterface $db )
+    public function __construct( array $config )
     {
-        $this->db = $db;
+        if( empty( $config['databases'] ) || !is_array($config['databases']) ){
+            throw new InvalidArgumentException('Array expected for config["tables"]');
+        }
+
+        foreach ( $config['databases'] as $aDbConf ) {
+            if ( !is_a($aDbConf['db'], '\Ormega\DbInterface') ) {
+                throw new InvalidArgumentException('Instance of \Ormega\DbInterface needed to start the model generator');
+            }
+        }
+
+        $this->aDb = $config['databases'];
+
+        if( isset($config['path']) ) {}
+            $this->sBasePath = $config['path'];
+
+        if( isset($config['namespace']) ) {}
+            $this->sDirBase = $config['namespace'];
+
     }
 
     /**
@@ -60,56 +83,66 @@ class Generator
     {
         $this->output('Start @ ' . date('Y-m-d H:i:s'));
 
-        $this->getTables();
-
         $this->aFiles[] = array(
             'file'    => $this->sDirBase . '/Orm.php',
             'content' => $this->genOrm(),
             'erase'   => true,
         );
 
-        foreach ( $this->aTables as $sTable ) {
+        foreach ( $this->aDb as $sDatabase => $aDb ) {
 
-            $this->getFields($sTable);
-            $this->getKeys($sTable);
+            $this->db = $aDb['db'];
+            $this->sDatabase = ucfirst($sDatabase);
+            $this->sTableFilter = $aDb['filter'];
 
-            if ( strpos($sTable, 'enum_') === 0 ) {
+            $this->output('Config : Filter tables with regular expression "' . $this->sTableFilter . '"');
+            $this->output('Config : Generate models in "' . $this->sBasePath . $this->sDirBase . '/' . $this->sDatabase . '"');
 
-                $this->aFiles[] = array(
-                    'file'    => $this->sDirBase . '/' . $this->sDirEnum . '/' . $this->formatPhpClassName($sTable) . '.php',
-                    'content' => $this->genFileEnum($sTable),
-                    'erase'   => true,
-                );
+            $this->getTables();
+
+            foreach ( $this->aTables as $sTable ) {
+
+                $this->getFields($sTable);
+                $this->getKeys($sTable);
+
+                if ( strpos($sTable, 'enum') === 0 ) {
+
+                    $this->aFiles[] = array(
+                        'file'    => $this->sDirBase . '/' . $this->sDatabase . '/' . $this->sDirEnum . '/' . $this->formatPhpClassName($sTable) . '.php',
+                        'content' => $this->genFileEnum($sTable),
+                        'erase'   => true,
+                    );
+                }
+                else {
+
+                    $this->aFiles[] = array(
+                        'file'    => $this->sDirBase . '/' . $this->sDatabase . '/' . $this->sDirEntity . '/' . $this->formatPhpClassName($sTable) . '.php',
+                        'content' => $this->genFileEntity($sTable),
+                        'erase'   => false,
+                    );
+
+                    $this->aFiles[] = array(
+                        'file'    => $this->sDirBase . '/' . $this->sDatabase . '/' . $this->sDirEntity . '/' . $this->sDirPrivate . '/' . $this->formatPhpClassName($sTable) . '.php',
+                        'content' => $this->genFileEntityPrivate($sTable),
+                        'erase'   => true,
+                    );
+
+                    $this->aFiles[] = array(
+                        'file'    => $this->sDirBase . '/' . $this->sDatabase . '/' . $this->sDirQuery . '/' . $this->formatPhpClassName($sTable) . '.php',
+                        'content' => $this->genFileQuery($sTable),
+                        'erase'   => false,
+                    );
+
+                    $this->aFiles[] = array(
+                        'file'    => $this->sDirBase . '/' . $this->sDatabase . '/' . $this->sDirQuery . '/' . $this->sDirPrivate . '/' . $this->formatPhpClassName($sTable) . '.php',
+                        'content' => $this->genFileQueryPrivate($sTable),
+                        'erase'   => true,
+                    );
+                }
             }
-            else {
 
-                $this->aFiles[] = array(
-                    'file'    => $this->sDirBase . '/' . $this->sDirEntity . '/' . $this->formatPhpClassName($sTable) . '.php',
-                    'content' => $this->genFileEntity($sTable),
-                    'erase'   => false,
-                );
-
-                $this->aFiles[] = array(
-                    'file'    => $this->sDirBase . '/' . $this->sDirEntity . '/' . $this->sDirPrivate . '/' . $this->formatPhpClassName($sTable) . '.php',
-                    'content' => $this->genFileEntityPrivate($sTable),
-                    'erase'   => true,
-                );
-
-                $this->aFiles[] = array(
-                    'file'    => $this->sDirBase . '/' . $this->sDirQuery . '/' . $this->formatPhpClassName($sTable) . '.php',
-                    'content' => $this->genFileQuery($sTable),
-                    'erase'   => false,
-                );
-
-                $this->aFiles[] = array(
-                    'file'    => $this->sDirBase . '/' . $this->sDirQuery . '/' . $this->sDirPrivate . '/' . $this->formatPhpClassName($sTable) . '.php',
-                    'content' => $this->genFileQueryPrivate($sTable),
-                    'erase'   => true,
-                );
-            }
+            $this->genFiles();
         }
-
-        $this->genFiles();
 
         $this->output('End @ ' . date('Y-m-d H:i:s'));
     }
@@ -128,6 +161,12 @@ class Generator
      */
     protected function getTables()
     {
+        $this->aTables = array();
+        $this->aCols = array();
+        $this->aKeys = array();
+        $this->aPrimaryKeys = array();
+        $this->aForeignKeys = array();
+
         $req = $this->db->query('SHOW TABLES');
         while ( $aTable = $this->db->fetch_row($req) ) {
             if ( empty($this->sTableFilter) || preg_match('/' . $this->sTableFilter . '/', $aTable[0]) )
@@ -135,80 +174,6 @@ class Generator
         }
 
         $this->output('Table list : ' . implode(' ; ', $this->aTables));
-    }
-
-    /**
-     * Generate the code for the bridge between the app and the generated
-     * classes
-     *
-     * @return string
-     *
-     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
-     */
-    protected function genOrm()
-    {
-        return '<?php
-            
-namespace ' . $this->sDirBase . ';
-        
-class Orm {
-
-    const OPERATOR_GREATER_THAN = ">";
-    const OPERATOR_LOWER_THAN = "<";
-    const OPERATOR_GREATEREQUALS_THAN = ">=";
-    const OPERATOR_LOWEREQUALS_THAN = "<=";
-    const OPERATOR_EQUALS = "=";
-    const OPERATOR_IN = "IN";
-    const ORDER_ASC = "ASC";
-    const ORDER_DESC = "DESC";
-    
-    /**
-     * @var \Ormega\DbInterface $db
-     */
-    protected static $db;
-
-    /**
-     * Obtain the database driver set in the init() method
-     * @return \Ormega\DbInterface
-     */
-    public static function driver(){
-        return self::$db;
-    }
-    
-    /**
-     * Initiate the orm with a database connection (can be adapted to any driver
-     *      as long as it implement the \Ormega\DbInterface interface).
-     * Define an autoload for all Ormega generated classes
-     *
-     * @param \Ormega\DbInterface $db Database interface
-     * @return void
-     */
-    public static function init(\Ormega\DbInterface $db){
-
-        self::$db = $db;
-
-        spl_autoload_register(function($class){
-
-            $aPaths = explode("\\\", $class);
-
-            if( isset($aPaths[0]) && $aPaths[0] == __NAMESPACE__ ) {
-                $basepath = __DIR__."/";
-
-                if( isset($aPaths[1]) && is_dir($basepath.$aPaths[1]) ){
-                    $basepath = $basepath.$aPaths[1]."/";
-
-                    if( isset($aPaths[2]) && is_dir($basepath.$aPaths[2]) ){
-                        $basepath = $basepath.$aPaths[2]."/";
-                    }
-                }
-
-                if( is_file($basepath.end($aPaths).".php") ){
-                    require_once $basepath.end($aPaths).".php";
-                }
-            }
-        });
-    }
-}';
     }
 
     /**
@@ -221,7 +186,7 @@ class Orm {
     protected function getFields( $sTable )
     {
         $this->aCols[ $sTable ] = array();
-        $req = $this->db->query('SHOW COLUMNS FROM ' . $sTable);
+        $req = $this->db->query('SHOW COLUMNS FROM `' . $sTable . '`');
         while ( $aCol = $this->db->fetch_assoc($req) ) {
             $this->aCols[ $sTable ][ $aCol['Field'] ] = $aCol;
         }
@@ -249,24 +214,131 @@ class Orm {
             $this->aKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
             if ( $aKey['CONSTRAINT_NAME'] == 'PRIMARY' )
                 $this->aPrimaryKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
+
             if ( $this->isGenerableForeignKey($sTable, $this->aCols[ $sTable ][ $aKey['COLUMN_NAME'] ]) )
                 $this->aForeignKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
         }
     }
 
+    /**
+     * Check if a Column is a foreign key
+     * and if we can map it with an Entity object of the referenced table
+     *
+     * @param string $sTable Table name
+     * @param array $aCol Sql column infos
+     *
+     * @return bool
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
     protected function isGenerableForeignKey( $sTable, array $aCol )
     {
         return
             isset($this->aKeys[ $sTable ][ $aCol['Field'] ])
+            && !empty($this->aKeys[ $sTable ][ $aCol['Field'] ]['REFERENCED_COLUMN_NAME'])
+            && !empty($this->aKeys[ $sTable ][ $aCol['Field'] ]['REFERENCED_TABLE_NAME'])
             && !isset($this->aPrimaryKeys[ $sTable ][ $aCol['Field'] ])
-            && strpos($aCol['Field'], 'enum_') === false;
+            && strpos($aCol['Field'], 'enum') === false;
     }
 
-    protected function formatPhpClassName( $sName )
+
+
+    /**
+     * Generate the code for the bridge between the app and the generated
+     * classes
+     *
+     * @return string
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
+    protected function genOrm()
     {
-        return str_replace('_', '', ucwords($sName, '_'));
-    }
+        return '<?php
+            
+namespace ' . $this->sDirBase . ';
+        
+class Orm {
 
+    const OPERATOR_GREATER_THAN = ">";
+    const OPERATOR_LOWER_THAN = "<";
+    const OPERATOR_GREATEREQUALS_THAN = ">=";
+    const OPERATOR_LOWEREQUALS_THAN = "<=";
+    const OPERATOR_EQUALS = "=";
+    const OPERATOR_IN = "IN";
+    const OPERATOR_NOTIN = "NOT IN";
+    const OPERATOR_PC_LIKE_PC = "%LIKE%";
+    const OPERATOR_PC_LIKE = "%LIKE";
+    const OPERATOR_LIKE_PC = "LIKE%";
+    
+    const ORDER_ASC = "ASC";
+    const ORDER_DESC = "DESC";
+        
+    /**
+     * @var array $aDb array of \Ormega\DbInterface
+     */
+    protected static $aDb;
+
+    /**
+     * Get the database driver set in the init() method
+     *
+     * @param string $sClassName Classname of the calling class, used to determine which connection use in case of multiple database connections
+     *
+     * @return \Ormega\DbInterface
+     */
+    public static function driver( $sClassName )
+    {
+        $aClass = explode("\\\", $sClassName);
+
+        if( isset($aClass[1]) && isset( self::$aDb[ $aClass[1] ] ) )
+            return self::$aDb[ $aClass[1] ];
+        else
+            return reset(self::$aDb);
+    }
+    
+    /**
+     * Initiate the orm with a database connection (can be adapted to any driver
+     *      as long as it implement the \Ormega\DbInterface interface).
+     * Define an autoload for all Ormega generated classes
+     *
+     * @param array $aDb Array of CI_DB_driver objects
+     * @return void
+     */
+    public static function init(array $aDb)
+    {
+        self::$aDb = array();
+        foreach ( $aDb as $sDatabase => $aDbDriver ) {
+            if ( !is_a($aDbDriver, "\Ormega\DbInterface") ) {
+                throw new \\InvalidArgumentException("Array of \Ormega\DbInterface objects expected for " . __METHOD__);
+            }
+            self::$aDb[ ucfirst($sDatabase) ] = $aDbDriver;
+        }
+
+        spl_autoload_register(function($class){
+
+            $aPaths = explode("\\\", $class);
+
+            if( isset($aPaths[0]) && $aPaths[0] == __NAMESPACE__  &&
+                isset($aPaths[1]) && isset( self::$aDb[ $aPaths[1] ] )
+            ) {
+                $basepath = __DIR__."/".$aPaths[1]."/";
+
+                if( isset($aPaths[2]) && is_dir($basepath.$aPaths[2]) ){
+                    $basepath = $basepath.$aPaths[2]."/";
+
+                    if( isset($aPaths[3]) && is_dir($basepath.$aPaths[3]) ){
+                        $basepath = $basepath.$aPaths[3]."/";
+                    }
+                }
+
+                if( is_file($basepath.end($aPaths).".php") ){
+                    require_once $basepath.end($aPaths).".php";
+                }
+            }
+        });
+    }
+}';
+    }
+    
     /**
      * Gen code for specifics table beginning with "enum_" in is name
      * This classe will only content CONSTANTS
@@ -288,18 +360,20 @@ class Orm {
      */
     protected function genFileEnum( $sTable )
     {
+        $pattern = '/([^\w])/';
         $sClassName = $this->formatPhpClassName($sTable);
 
         $req = $this->db->query("SELECT id, label, constant FROM $sTable");
 
         $aConstants = array();
         while ( $aData = $this->db->fetch_assoc($req) ) {
+            $aData['constant'] = strtoupper( preg_replace($pattern, '', $aData['constant']) );
             $aConstants[] = $aData;
         }
 
         $php = '<?php 
         
-namespace ' . $this->sDirBase . '\\' . $this->sDirEnum . ';
+namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEnum . ';
 
 class ' . $sClassName . ' {
 ';
@@ -313,13 +387,37 @@ class ' . $sClassName . ' {
         }
 
         $php .= '
+    
+    /**
+     * Get an ID from a string constant
+     * @param string $sConstant
+     * @return int
+     * @author ' . __CLASS__ . '
+     */
+    public static function getId( $sConstant )
+    {
+        switch( $sConstant ){';
+
+        foreach ( $aConstants as $aConstant ) {
+            $php .= '
+            case "'. $aConstant['constant'] .'":
+                return self::'. $aConstant['constant'] .';
+                break;';
+        }
+
+        $php .= '
+            default:
+                return 0;
+        }
+    }
         
     /**
      * Get all the constants in a array form
      * @return array
      * @author ' . __CLASS__ . '
      */
-    public static function getArray(){
+    public static function getArray()
+    {
         return array(
             ';
 
@@ -338,7 +436,7 @@ class ' . $sClassName . ' {
     /**
      * Generate the "public" entity class
      * The entity class is made to "emulate" a table in php
-     * Each Entity object represente one row
+     * Each Entity object represent one row
      * This classes are used to save data (insert and update)
      *
      * The "public" file can be freely modified by end user as it's not
@@ -356,7 +454,7 @@ class ' . $sClassName . ' {
 
         $php = '<?php 
         
-namespace ' . $this->sDirBase . '\\' . $this->sDirEntity . ';
+namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . ';
 
 class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . ' {
             
@@ -381,26 +479,62 @@ class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . 
 
         $php = '<?php 
         
-namespace ' . $this->sDirBase . '\\' . $this->sDirEntity . '\\' . $this->sDirPrivate . ';
+namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->sDirPrivate . ';
 
 class ' . $sClassName . ' {
             
     /**
      * @var bool $_isLoadedFromDb for intern usage : let know the class data comes from db or not 
      */
-    protected $_isLoadedFromDb = false;
+    protected $_isLoadedFromDb;
     
     /**
      * @var bool $_isModified for intern usage : let know the class if data changed from last save
      */
-    protected $_isModified     = false;
+    protected $_isModified;
 ';
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
             $php .= $this->genAttribute($aCol);
         }
+
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
             $php .= $this->genForeignAttribute($sTable, $this->aCols[ $sTable ][ $sKeyName ]);
         }
+
+        $php .= $this->genConstructor($sClassName, $sTable);
+       $php .= '
+        
+    /**
+     * Check if the model is loaded from bdd
+     * @param boolean $bLoaded
+     * @return boolean
+     * @author ' . __CLASS__ . '
+     */
+    public function loaded($bLoaded = null)
+    {
+        if (!is_null($bLoaded) && is_bool($bLoaded)) {
+            $this->_isLoadedFromDb = $bLoaded;
+        }
+
+        return $this->_isLoadedFromDb;
+    }
+    
+    /**
+     * Check if the object has been modified since the load 
+     * @param boolean $bModified
+     * @return boolean
+     * @author ' . __CLASS__ . '
+     */
+    public function modified($bModified = null)
+    {
+        if (!is_null($bModified) && is_bool($bModified)) {
+            $this->_isModified = $bModified;
+        }
+
+        return $this->_isModified;
+    }    
+    ';
+
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
             $php .= $this->genGetter($aCol);
         }
@@ -408,7 +542,7 @@ class ' . $sClassName . ' {
             $php .= $this->genGetterForeignKey($sTable, $this->aCols[ $sTable ][ $sKeyName ]);
         }
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
-            $php .= $this->genSetter($aCol);
+            $php .= $this->genSetter($sTable, $aCol);
         }
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
             $php .= $this->genSetterForeignKey($sTable, $this->aCols[ $sTable ][ $sKeyName ]);
@@ -423,13 +557,47 @@ class ' . $sClassName . ' {
         return $php;
     }
 
+    protected function genConstructor($sClassName, $sTable)
+    {
+        $aAttrs = $aAttrSigns = array();
+        foreach ( $this->aPrimaryKeys[ $sTable ] as $sPrimaryKey => $aPK ) {
+            $sAttr = $this->formatPhpAttrName( $aPK['COLUMN_NAME'] );
+            $aAttrs[] = $sAttr;
+            $aAttrSigns[] = '$' . $sAttr . ' = null';
+        }
+
+        $php = '
+    /**
+     * ' . $sClassName . ' constructor
+     * @return void
+     * @author ' . __CLASS__ . '
+     */
+    public function __construct('.implode(', ', $aAttrSigns).')
+    {';
+
+        foreach ( $aAttrs as $sAttr ) {
+            $sFuncName = $this->formatPhpFuncName($sAttr);
+            $php .= '
+        if ( $'.$sAttr.' ) {
+            $this->set'.$sFuncName.'($'.$sAttr.');
+        }
+        ';
+        }
+
+        $php .= '
+        $this->_isLoadedFromDb  = false;
+        $this->_isModified      = false;
+    }';
+
+        return $php;
+    }
+
     protected function genAttribute( array $aCol )
     {
         $sAttrName = $this->formatPhpAttrName($aCol['Field']);
         $sType = $this->getPhpType($aCol);
 
         $php = '
-        
     /**
      * @var ' . $sType . ' $' . $sAttrName . ' Null:' . $aCol['Null'] . ' Maxlenght:' . $this->getMaxLength($aCol) . ' ' . $aCol['Extra'] . '
      */
@@ -439,79 +607,14 @@ class ' . $sClassName . ' {
         return $php;
     }
 
-    protected function formatPhpAttrName( $sName )
-    {
-        return $sName;
-    }
-
-    protected function getPhpType( $aCol )
-    {
-        preg_match('/^([a-z]+)/', $aCol['Type'], $aMatches);
-        $sType = $aMatches[0];
-
-        switch ( $sType ) {
-            case 'tinyint':
-                if ( $this->getMaxLength($aCol) == 1 ) {
-                    $sType = 'bool';
-                }
-                else {
-                    $sType = 'int';
-                }
-                break;
-            case 'int':
-                $sType = 'int';
-                break;
-            case 'float':
-                $sType = 'float';
-                break;
-            case 'varchar':
-            case 'text':
-            case 'tinytext':
-            case 'timestamp':
-            case 'datetime':
-                $sType = 'string';
-                break;
-        }
-
-        return $sType;
-    }
-
-    protected function getMaxLength( array $aCol )
-    {
-        $nMaxlength = null;
-
-        preg_match('/\(([0-9]+)\)/', $aCol['Type'], $aMatches);
-        if ( isset($aMatches[1]) )
-            $nMaxlength = (int)$aMatches[1];
-        else {
-            switch ( $aCol['Type'] ) {
-                case 'timestamp':
-                case 'datetime':
-                    $nMaxlength = 19;
-                    break;
-                case 'tinytext':
-                    $nMaxlength = 255;
-                    break;
-                case 'text':
-                    $nMaxlength = 65000;
-                    break;
-            }
-        }
-
-        return $nMaxlength;
-    }
-
     public function genForeignAttribute( $sTable, array $aCol )
     {
-
         $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
+        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
-
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($sObjAttrName);
+        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $php = '
-        
     /**
      * @var ' . $sType . ' $' . $sObjAttrName . ' Null:' . $aCol['Null'] . ' ' . $aCol['Extra'] . '
      */
@@ -540,20 +643,14 @@ class ' . $sClassName . ' {
         return $php;
     }
 
-    protected function formatPhpFuncName( $sName )
-    {
-        return str_replace('_', '', ucwords($sName, '_'));
-    }
-
     public function genGetterForeignKey( $sTable, array $aCol )
     {
-
         $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
 
-        $sObjFuncName = $this->formatPhpFuncName($aFK['REFERENCED_TABLE_NAME']);
-        $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
+        $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
+        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($sObjAttrName);
+        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $php = '
     
@@ -569,7 +666,7 @@ class ' . $sClassName . ' {
         return $php;
     }
 
-    protected function genSetter( array $aCol )
+    protected function genSetter( $sTable, array $aCol )
     {
         $sFuncName = $this->formatPhpFuncName($aCol['Field']);
         $sAttrName = $this->formatPhpAttrName($aCol['Field']);
@@ -596,6 +693,18 @@ class ' . $sClassName . ' {
             throw new \InvalidArgumentException("Invalid parameter for ".__METHOD__." : (' . $sType . ') excepted ($' . $sAttrName . ') provided");
             
         $this->' . $sAttrName . ' = $' . $sAttrName . ';
+        ';
+
+        if( isset($this->aForeignKeys[ $sTable ][ $aCol['Field'] ]) ){
+            $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
+            $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
+            $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
+
+            $php .= '$this->' . $sObjAttrName . ' = new '.$sType.'($' . $sAttrName . ');
+            ';
+        }
+
+        $php .= '
         $this->_isModified = true;
         
         return $this;
@@ -606,13 +715,12 @@ class ' . $sClassName . ' {
 
     public function genSetterForeignKey( $sTable, array $aCol )
     {
+        $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
 
-        $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
+        $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
+        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
 
-        $sObjFuncName = $this->formatPhpFuncName($aFK['REFERENCED_TABLE_NAME']);
-        $sObjAttrName = $this->formatPhpAttrName($aFK['REFERENCED_TABLE_NAME']);
-
-        $sType = '\\' . $this->sDirBase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($sObjAttrName);
+        $sType = '\\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
 
         $sAttrName = $this->formatPhpAttrName($aCol['Field']);
         $sReferencedAttr = $this->formatPhpFuncName($aFK['REFERENCED_COLUMN_NAME']);
@@ -711,9 +819,9 @@ class ' . $sClassName . ' {
         return $php;
     }
 
-    protected function getPhpEscape( $var, $type )
+    protected function getPhpEscape( $var )
     {
-        return $this->sqlEscQuote . $this->sqlQuote . '.\\' . $this->sDirBase . '\Orm::driver()->escape(' . $var . ', "' . $type . '").' . $this->sqlQuote . $this->sqlEscQuote;
+        return $this->sqlQuote . '.\\' . $this->sDirBase . '\Orm::driver(__CLASS__)->escape(' . $var . ').' . $this->sqlQuote;
     }
 
     /**
@@ -1085,25 +1193,123 @@ class ' . $sClassName . ' {
         else return false;
     }
 
-    /* @TODO load in the Query generated class
-     * protected function genLoad( $sTable ){
-     * $sPKName = $this->formatPhpAttrName( $this->aKeys[ $sTable
-     * ]['PRIMARY']['Column_name'] );
-     * $php = '
+    protected function getPhpType( $aCol )
+    {
+        preg_match('/^([a-z]+)/', $aCol['Type'], $aMatches);
+        $sType = $aMatches[0];
+
+        switch ( $sType ) {
+            case 'tinyint':
+                if ( $this->getMaxLength($aCol) == 1 ) {
+                    $sType = 'bool';
+                }
+                else {
+                    $sType = 'int';
+                }
+                break;
+            case 'smallint':
+            case 'mediumint':
+            case 'int':
+            case 'bigint':
+            case 'bit':
+                $sType = 'int';
+                break;
+            case 'float':
+            case 'double':
+            case 'decimal':
+                $sType = 'float';
+                break;
+            case 'varchar':
+            case 'char':
+            case 'varbinary':
+            case 'tinytext':
+            case 'text':
+            case 'mediumtext':
+            case 'longtext':
+            case 'tinyblob':
+            case 'blob':
+            case 'mediumblob':
+            case 'longblob':
+            case 'timestamp':
+            case 'datetime':
+            case 'date':
+            case 'enum':
+                $sType = 'string';
+                break;
+        }
+
+        return $sType;
+    }
+
+    protected function getMaxLength( array $aCol )
+    {
+        $nMaxlength = null;
+
+        preg_match('/\(([0-9]+)\)/', $aCol['Type'], $aMatches);
+        if ( isset($aMatches[1]) )
+            $nMaxlength = (int)$aMatches[1];
+        else {
+            switch ( $aCol['Type'] ) {
+                case 'date';
+                    $nMaxlength = 10;
+                    break;
+                case 'timestamp':
+                case 'datetime':
+                    $nMaxlength = 19;
+                    break;
+                case 'tinytext':
+                case 'tinyblob':
+                    $nMaxlength = 255;
+                    break;
+                case 'text':
+                case 'blob':
+                    $nMaxlength = 65000;
+                    break;
+                case 'mediumtext':
+                case 'mediumblob':
+                    $nMaxlength = 16777215;
+                    break;
+                case 'longtext':
+                case 'longblob':
+                    $nMaxlength = 4294967295;
+                    break;
+            }
+        }
+
+        return $nMaxlength;
+    }
+
+    protected function formatPhpFuncName( $sName )
+    {
+        return str_replace(array('-','_'), '', ucwords($sName, '_'));
+    }
+
+    protected function formatPhpForeignFuncName( $sName )
+    {
+        return str_replace(array('-','_'), '', ucwords(substr( $sName, 0, strrpos( $sName, '_' ) ), '_'));
+    }
+
+    protected function formatPhpClassName( $sName )
+    {
+        return str_replace(array('-','_'), '', ucwords($sName, '_'));
+    }
+
+    protected function formatPhpAttrName( $sName )
+    {
+        return $sName;
+    }
+
+    /**
+     * Return the name of the attribute without the characters after the last underscore (_)
      *
-     * public function load(){
+     * @param string $name
      *
-     * if( !$this->_isLoadedFromDb && $this->'.$sPKName.' ){
-     * $res = \Omega\Orm::driver()->query(
-     * '.$this->sqlQuote.'SELECT * FROM '.$sTable.' WHERE '.$this->aKeys[
-     * $sTable ]['PRIMARY']['Column_name'].' =
-     * '.$this->getPhpEscape('$this->'.$sPKName, 'int').'
-     * );
-     * $this->_isLoadedFromDb = true;
-     * }
-     * }';
+     * @return string
      *
-     * return $php;
-     * }
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
      */
+    protected function formatPhpForeignAttrName( $sName )
+    {
+        return substr( $sName, 0, strrpos( $sName, '_' ) );
+    }
 }
