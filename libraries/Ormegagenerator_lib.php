@@ -648,6 +648,25 @@ class ' . $sClassName . ' {
      */
     public function get' . $sObjFuncName . '()
     {
+        if( is_null($this->'.$sObjAttrName.') ){';
+
+        if( isset($this->aForeignKeys[ $sTable ][ $aCol['Field'] ]) ){
+            $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
+            $sQuery = '\\' . $this->sDirBase
+                . '\\' . $this->sDatabase
+                . '\\' . $this->sDirQuery
+                . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
+
+                $php .= '
+            $this->' . $sObjAttrName . ' = '.$sQuery.'::create()
+                ->filterBy'.$this->formatPhpFuncName( $aFK['REFERENCED_COLUMN_NAME'] )
+                .'($this->'.$this->formatPhpAttrName( $aCol['Field'] ).')
+                ->findOne();';
+        }
+
+        $php .= '
+        }
+        
         return $this->' . $sObjAttrName . ';
     }';
 
@@ -682,25 +701,6 @@ class ' . $sClassName . ' {
          }
             
         $this->' . $sAttrName . ' = $' . $sAttrName . ';
-        ';
-
-        if( isset($this->aForeignKeys[ $sTable ][ $aCol['Field'] ]) ){
-            $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
-            $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
-            $sQuery = '\\' . $this->sDirBase
-                . '\\' . $this->sDatabase
-                . '\\' . $this->sDirQuery
-                . '\\' . $this->formatPhpClassName($aFK['REFERENCED_TABLE_NAME']);
-
-            $php .= '$this->' . $sObjAttrName . ' = '
-                .$sQuery.'::create()
-                ->filterBy'.$this->formatPhpFuncName( $aFK['REFERENCED_COLUMN_NAME'] )
-                .'($'.$this->formatPhpAttrName( $aCol['Field'] ).')
-                ->findOne();
-            ';
-        }
-
-        $php .= '
         $this->_isModified = true;
         
         return $this;
