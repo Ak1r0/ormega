@@ -1049,7 +1049,7 @@ class ' . $sClassName . ' {
     public function orderBy' . $sFuncName . '( $order = \Ormega\Orm::ORDER_ASC )
     {
         \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
-            ->order_by('.$this->sqlQuote . $this->sDatabase .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote.', $order);
+            ->order_by('.$this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote.', $order);
         return $this;
     }';
 
