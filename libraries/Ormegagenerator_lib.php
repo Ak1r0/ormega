@@ -958,22 +958,28 @@ class ' . $sClassName . ' {
         
         switch( $operator ){
             case \Ormega\Orm::OPERATOR_IN:
-                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->where_in(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value);
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->where_in(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote . ', $value);
                 break;
             case \Ormega\Orm::OPERATOR_NOTIN:
-                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->where_not_in(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value);
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->where_not_in(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote . ', $value);
                 break;
             case \Ormega\Orm::OPERATOR_LIKE_PC:
-                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->like(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'after'.$this->sqlQuote.');
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->like(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'after'.$this->sqlQuote.');
                 break;
             case \Ormega\Orm::OPERATOR_PC_LIKE:
-                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->like(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'before'.$this->sqlQuote.');
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->like(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'before'.$this->sqlQuote.');
                 break;
             case \Ormega\Orm::OPERATOR_PC_LIKE_PC:
-                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->like(' . $this->sqlQuote . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'both'.$this->sqlQuote.');
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->like(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'both'.$this->sqlQuote.');
                 break;
             default:
-                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->where( ' . $this->sqlQuote . $aCol['Field'] . ' ' . $this->sqlQuote . '.$operator, $value );
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->where( ' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . ' ' . $this->sqlQuote . '.$operator, $value );
         }
         
         return $this;
@@ -1002,7 +1008,8 @@ class ' . $sClassName . ' {
      */
     public function groupBy' . $sFuncName . '()
     {
-        \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->group_by('.$this->sqlQuote . $aCol['Field'] . $this->sqlQuote.');
+        \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+            ->group_by('.$this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote.');
         return $this;
     }';
 
@@ -1030,7 +1037,8 @@ class ' . $sClassName . ' {
      */
     public function orderBy' . $sFuncName . '( $order = \Ormega\Orm::ORDER_ASC )
     {
-        \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->order_by('.$this->sqlQuote . $aCol['Field'] . $this->sqlQuote.', $order);
+        \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+            ->order_by('.$this->sqlQuote . $this->sDatabase .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote.', $order);
         return $this;
     }';
 
@@ -1045,7 +1053,7 @@ class ' . $sClassName . ' {
 
         $aColumns = array();
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
-            $aColumns[] = $aCol['Field'];
+            $aColumns[] = $this->db->database.'.'.$sTable.'.'.$aCol['Field'];
         }
 
         $php = '
@@ -1061,11 +1069,16 @@ class ' . $sClassName . ' {
 
         $aReturn = array();
 
-        $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->select(' . $this->sqlQuote . implode(',', $aColumns) . $this->sqlQuote . ')->get(' . $this->sqlQuote . $sTable . $this->sqlQuote . ');
+        $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+            ->select(' . $this->sqlQuote . implode(',', $aColumns) . $this->sqlQuote . ')
+            ->get(' . $this->sqlQuote . $this->db->database .'.'. $sTable . $this->sqlQuote . ');
         
         foreach( $query->result() as $row ){
             
-            $obj = new \\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\'.$sClassName.'();
+            $obj = new \\' . $this->sDirBase
+                . '\\' . $this->sDatabase
+                . '\\' . $this->sDirEntity
+                . '\\'.$sClassName.'();
             ';
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
