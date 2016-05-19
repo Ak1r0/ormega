@@ -264,11 +264,14 @@ class Orm {
     const OPERATOR_GREATEREQUALS_THAN = ">=";
     const OPERATOR_LOWEREQUALS_THAN = "<=";
     const OPERATOR_EQUALS = "=";
+    const OPERATOR_DIFF = "<>";
     const OPERATOR_IN = "IN";
     const OPERATOR_NOTIN = "NOT IN";
     const OPERATOR_PC_LIKE_PC = "%LIKE%";
     const OPERATOR_PC_LIKE = "%LIKE";
     const OPERATOR_LIKE_PC = "LIKE%";
+    const OPERATOR_ISNULL = "IS NULL";
+    const OPERATOR_ISNOTNULL = "IS NOT NULL";
     
     const ORDER_ASC = "ASC";
     const ORDER_DESC = "DESC";
@@ -396,7 +399,7 @@ class ' . $sClassName . ' {
      */
     public static function getId( $sConstant )
     {
-        switch( $sConstant ){';
+        switch( strtoupper($sConstant) ){';
 
         foreach ( $aConstants as $aConstant ) {
             $php .= '
@@ -976,6 +979,14 @@ class ' . $sClassName . ' {
             case \Ormega\Orm::OPERATOR_PC_LIKE_PC:
                 \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
                     ->like(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . $this->sqlQuote . ', $value, '.$this->sqlQuote.'both'.$this->sqlQuote.');
+                break;
+            case \Ormega\Orm::OPERATOR_ISNULL:
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->where(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . ' IS NULL' . $this->sqlQuote . ');
+                break;
+            case \Ormega\Orm::OPERATOR_ISNOTNULL:
+                \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+                    ->where(' . $this->sqlQuote . $this->db->database .'.'. $sTable . '.' . $aCol['Field'] . ' IS NOT NULL' . $this->sqlQuote . ');
                 break;
             default:
                 \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
