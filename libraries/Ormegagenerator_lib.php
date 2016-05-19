@@ -694,7 +694,7 @@ class ' . $sClassName . ' {
 
             $php .= '$this->' . $sObjAttrName . ' = '
                 .$sQuery.'::create()
-                ->filterBy'.$this->formatPhpFuncName( $aCol['Field'] )
+                ->filterBy'.$this->formatPhpFuncName( $aFK['REFERENCED_COLUMN_NAME'] )
                 .'($'.$this->formatPhpAttrName( $aCol['Field'] ).')
                 ->findOne();
             ';
