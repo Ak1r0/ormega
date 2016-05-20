@@ -431,6 +431,46 @@ class ' . $sClassName . ' {
         $php .= '
         );
     }    
+    
+    /**
+     * The label (description) associated with one ID
+     * @param int $nId Constant ID
+     * @return string
+     * @author ' . __CLASS__ . '
+     */
+    public static function getLabel( $nId ){
+        
+        $aLabels = array(';
+
+        foreach ( $aConstants as $aConstant ) {
+            $php .= '
+            '.$aConstant['id'] . ' => "' . $aConstant['label'] .'",';
+        }
+        $php .= '
+        );
+        
+        return isset($aLabels[ $nId ])? $aLabels[ $nId ] : "";
+    }
+    
+    /**
+     * The constant string associated with one ID
+     * @param int $nId Constant ID
+     * @return string
+     * @author ' . __CLASS__ . '
+     */
+    public static function getConstant( $nId ){
+        
+        $aConstants = array(';
+
+        foreach ( $aConstants as $aConstant ) {
+            $php .= '
+            '.$aConstant['id'] . ' => "' . $aConstant['constant'] .'",';
+        }
+        $php .= '
+        );
+        
+        return isset($aConstants[ $nId ])? $aConstants[ $nId ] : "";
+    }
 }';
 
         return $php;
