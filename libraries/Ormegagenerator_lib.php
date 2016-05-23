@@ -86,6 +86,30 @@ class Ormegagenerator_lib
             'erase'   => true,
         );
 
+        $this->aFiles[] = array(
+            'file'    => $this->sDirBase . '/EntitiesCollection.php',
+            'content' => $this->genEntitiesCollection(),
+            'erase'   => true,
+        );
+
+        $this->aFiles[] = array(
+            'file'    => $this->sDirBase . '/EntityInterface.php',
+            'content' => $this->genEntityInterface(),
+            'erase'   => true,
+        );
+
+        $this->aFiles[] = array(
+            'file'    => $this->sDirBase . '/QueryInterface.php',
+            'content' => $this->genQueryInterface(),
+            'erase'   => true,
+        );
+
+        $this->aFiles[] = array(
+            'file'    => $this->sDirBase . '/EnumInterface.php',
+            'content' => $this->genEnumInterface(),
+            'erase'   => true,
+        );
+
         foreach ( $this->aDb as $sDatabase => $aDb ) {
 
             $this->db = $aDb['db'];
@@ -287,6 +311,8 @@ class Orm {
      * @param string $sClassName Classname of the calling class, used to determine which connection use in case of multiple database connections
      *
      * @return CI_DB_driver
+     *
+     * @author ' . __CLASS__ . '
      */
     public static function driver( $sClassName )
     {
@@ -305,6 +331,8 @@ class Orm {
      *
      * @param array $aDb Array of CI_DB_driver objects
      * @return void
+     *
+     * @author ' . __CLASS__ . '
      */
     public static function init(array $aDb)
     {
@@ -317,29 +345,246 @@ class Orm {
         }
 
         spl_autoload_register(function($class){
-
             $aPaths = explode("\\\", $class);
 
-            if( isset($aPaths[0]) && $aPaths[0] == __NAMESPACE__  &&
-                isset($aPaths[1]) && isset( self::$aDb[ $aPaths[1] ] )
-            ) {
-                $basepath = __DIR__."/".$aPaths[1]."/";
+            if( isset($aPaths[0]) && $aPaths[0] == __NAMESPACE__ ) {
 
-                if( isset($aPaths[2]) && is_dir($basepath.$aPaths[2]) ){
-                    $basepath = $basepath.$aPaths[2]."/";
-
-                    if( isset($aPaths[3]) && is_dir($basepath.$aPaths[3]) ){
-                        $basepath = $basepath.$aPaths[3]."/";
+                $basepath = __DIR__."/";
+                if( isset($aPaths[1]) && isset( self::$aDb[ $aPaths[1] ] ) ) {
+                    $basepath = $basepath.$aPaths[1]."/";
+    
+                    if( isset($aPaths[2]) && is_dir($basepath.$aPaths[2]) ){
+                        $basepath = $basepath.$aPaths[2]."/";
+    
+                        if( isset($aPaths[3]) && is_dir($basepath.$aPaths[3]) ){
+                            $basepath = $basepath.$aPaths[3]."/";
+                        }
                     }
                 }
-
+                
                 if( is_file($basepath.end($aPaths).".php") ){
                     require_once $basepath.end($aPaths).".php";
                 }
             }
         });
     }
+}
+';
+
+    }
+
+    protected function genEntitiesCollection(){
+        return '<?php
+            
+namespace ' . $this->sDirBase . ';
+
+class EntitiesCollection implements \ArrayAccess, \Iterator {
+
+    /**
+     * @var array Array of entities
+     */
+    protected $aEntities = array();
+            
+    /**
+     * Constructor
+     * @author ' . __CLASS__ . '
+     */
+    public function __construct() 
+    {
+        $this->aEntities = array();
+    }
+    
+    /**
+     * Get all keys of the entities array 
+     */
+    public function getArrayKeys()
+    {
+        return array_keys( $this->aEntities );
+    }
+    
+    /**
+     * Execute a function on every elements
+     *
+     * @param string $sMethodName Method name
+     *
+     * @return array
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
+    public function __call( $sMethodName, array $aArgs = array() )
+    {
+        $aReturn = array();
+        foreach ( $this->aEntities as $oEntity ){
+            if( method_exists($oEntity, $sMethodName) )
+                $aReturn[ $oEntity->getPkId() ] = call_user_func_array( array($oEntity, $sMethodName), $aArgs);
+        }
+        return $aReturn;
+    }
+
+    /**
+     * Replace l\'itérateur sur le premier élément
+     *
+     * @abstracting Iterator
+     * @author ' . __CLASS__ . '
+     */
+    function rewind() 
+    {
+        return reset($this->aEntities);
+    }
+
+    /**
+     * Retourne l\'élément courant
+     *
+     * @return mixed
+     *
+     * @abstracting Iterator
+     * @author ' . __CLASS__ . '
+     */
+    function current() 
+    {
+        return current($this->aEntities);
+    }
+
+    /**
+     * Retourne la clé de l\'élément courant
+     *
+     * @return int
+     *
+     * @abstracting Iterator
+     * @author ' . __CLASS__ . '
+     */
+    function key() 
+    {
+        return key($this->aEntities);
+    }
+
+    /**
+     * Se déplace sur l\'élément suivant
+     *
+     * @abstracting Iterator
+     * @author ' . __CLASS__ . '
+     */
+    function next() 
+    {
+        return next($this->aEntities);
+    }
+
+    /**
+     * Vérifie si la position courante est valide
+     *
+     * @return bool
+     *
+     * @abstracting Iterator
+     * @author ' . __CLASS__ . '
+     */
+    function valid() 
+    {
+        return key($this->aEntities) !== null;
+    }
+
+    /**
+     * Assigne une valeur à une position donnée
+     *
+     * @param mixed $offset La position à laquelle assigner une valeur.
+     * @param mixed $value La valeur à assigner.
+     *
+     * @abstracting ArrayAccess
+     * @author ' . __CLASS__ . '
+     */
+    public function offsetSet($offset, $value) 
+    {
+        if( $value instanceof \Ormega\EntityInterface ){             
+            if (is_null($offset)) {
+                $this->aEntities[] = & $value;
+            } else {
+                $this->aEntities[$offset] = & $value;
+            }
+        }
+    }   
+
+    /**
+     * Retourne la valeur à la position donnée.
+     * Cette méthode est exécutée lorsque l\'on vérifie si une position est empty().
+     *
+     * @param mixed $offset La position à lire.
+     *
+     * @return \Ormega\EntityInterface|null
+     *
+     * @abstracting ArrayAccess
+     * @author ' . __CLASS__ . '
+     */
+    public function offsetGet($offset) 
+    {
+        return $this->offsetExists($offset) ? $this->aEntities[$offset] : null;
+    }
+
+    /**
+     * Indique si une position existe dans un tableau
+     * Cette méthode est exécutée lorsque la fonction isset() ou empty()
+     * est appliquée à un objet qui implémente l\'interface ArrayAccess.
+     *
+     * @param mixed $offset Une position à vérifier.
+     *
+     * @return bool Cette fonction retourne TRUE en cas de succès ou FALSE si une erreur survient.
+     *
+     * @abstracting ArrayAccess
+     * @author ' . __CLASS__ . '
+     */
+    public function offsetExists($offset) 
+    {
+        return isset($this->aEntities[$offset]);
+    }
+
+    /**
+     * Supprime un élément à une position donnée
+     *
+     * @param mixed $offset La position à supprimer.
+     *
+     * @abstracting ArrayAccess
+     * @author ' . __CLASS__ . '
+     */
+    public function offsetUnset($offset) 
+    {
+        if( $this->offsetExists($offset) ) {
+            unset($this->aEntities[$offset]);
+        }
+    }
 }';
+    }
+
+    protected function genEntityInterface() {
+        return '<?php
+            
+namespace ' . $this->sDirBase . ';
+
+interface EntityInterface {
+    
+    /**
+     * @return int Return the primary key ID
+     */
+    public function getPkId();
+}
+';
+    }
+
+    protected function genQueryInterface() {
+        return '<?php
+            
+namespace ' . $this->sDirBase . ';
+
+interface QueryInterface {
+}
+';
+    }
+
+    protected function genEnumInterface() {
+        return '<?php
+            
+namespace ' . $this->sDirBase . ';
+
+interface EnumInterface {
+}
+';
     }
 
     /**
@@ -378,7 +623,7 @@ class Orm {
         
 namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEnum . ';
 
-class ' . $sClassName . ' {
+class ' . $sClassName . ' implements \Ormega\EnumInterface {
 ';
         foreach ( $aConstants as $aConstant ) {
             $php .= '
@@ -524,7 +769,7 @@ class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . 
         
 namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->sDirPrivate . ';
 
-class ' . $sClassName . ' {
+class ' . $sClassName . ' implements \Ormega\EntityInterface {
             
     /**
      * @var bool $_isLoadedFromDb for intern usage : let know the class data comes from db or not 
@@ -542,6 +787,11 @@ class ' . $sClassName . ' {
 
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
             $php .= $this->genForeignAttribute($sTable, $this->aCols[ $sTable ][ $sKeyName ]);
+        }
+
+        $aPks = array();
+        foreach ($this->aPrimaryKeys[ $sTable ] as $aPk) {
+            $aPks[] = '$this->get'.$this->formatPhpFuncName($aPk['COLUMN_NAME']).'()';
         }
 
         $php .= $this->genConstructor($sClassName);
@@ -575,7 +825,21 @@ class ' . $sClassName . ' {
         }
 
         return $this->_isModified;
-    }    
+    }
+    
+    /**
+     * Get a unique identifier composed by all primary keys 
+     * with "-" separator
+     *
+     * @return string
+     * 
+     * @abstracted \Ormega\EntityInterface
+     * @author ' . __CLASS__ . '
+     */
+    public function getPkId(){
+        return (string)'.implode('."-".', $aPks).';
+    }
+    
     ';
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
@@ -888,7 +1152,7 @@ class ' . $sClassName . ' {
         
 namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirQuery . ';
 
-class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . ' {
+class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . ' implements implements \Ormega\QueryInterface {
 
            
 }';
@@ -963,9 +1227,7 @@ class ' . $sClassName . ' {
     public function findOne(){
 
         $this->limit(1);
-        $aReturn = $this->find();
-        
-        return !empty($aReturn[0])? $aReturn[0] : null;
+        return $this->find()->rewind();
     }
         
 }';
@@ -1113,12 +1375,12 @@ class ' . $sClassName . ' {
      * Start the select request composed with any filter, groupby,... set before
      * Return an array of 
      *      \\' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\'.$sClassName.' object 
-     * @return array
+     * @return \Ormega\EntitiesCollection
      * @author '.__CLASS__.'
      */
     public function find(){
 
-        $aReturn = array();
+        $aReturn = new \Ormega\EntitiesCollection();
 
         $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
             ->select(' . $this->sqlQuote . implode(',', $aColumns) . $this->sqlQuote . ')
@@ -1131,6 +1393,8 @@ class ' . $sClassName . ' {
                 . '\\' . $this->sDirEntity
                 . '\\'.$sClassName.'();
             ';
+
+        $aIdentifier = array();
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
 
@@ -1149,11 +1413,13 @@ class ' . $sClassName . ' {
             }
         }
 
+
+
         $php .= '
             $obj->loaded(true);
             $obj->modified(false);
             
-            $aReturn[] = $obj;
+            $aReturn[ $obj->getPkId() ] = $obj;
         }
 
         return $aReturn;
