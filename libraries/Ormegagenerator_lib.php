@@ -396,11 +396,24 @@ class EntitiesCollection implements \ArrayAccess, \Iterator {
     
     /**
      * Get all keys of the entities array 
+     * @return array
+     * @author ' . __CLASS__ . '
      */
     public function getArrayKeys()
     {
         return array_keys( $this->aEntities );
     }
+    
+    /**
+     * Is the collection empty ?
+     * @return bool
+     * @author ' . __CLASS__ . '
+     */
+    public function isEmpty() 
+    {
+        return empty( $this->aEntities );
+    }
+    
     
     /**
      * Execute a function on every elements
