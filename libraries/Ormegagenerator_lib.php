@@ -1165,11 +1165,6 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         return $php;
     }
 
-    protected function getPhpEscape( $var )
-    {
-        return $this->sqlQuote . '.\\' . $this->sDirBase . '\Orm::driver(__CLASS__)->escape(' . $var . ').' . $this->sqlQuote;
-    }
-
     /**
      * Generate the code for the 'public' query file
      * This file allow the "SELECT" requests from a table
@@ -1191,7 +1186,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         
 namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirQuery . ';
 
-class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . ' implements implements \Ormega\QueryInterface {
+class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . ' {
 
            
 }';
@@ -1219,7 +1214,7 @@ class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . 
         
 namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirQuery . '\\' . $this->sDirPrivate . ';
 
-class ' . $sClassName . ' {
+class ' . $sClassName . ' implements \Ormega\QueryInterface {
     
     /**
      * Get an instance of this class to chain methods 
@@ -1575,6 +1570,11 @@ class ' . $sClassName . ' {
     {
         if( isset($aCol['Null']) && $aCol['Null'] == 'YES') return true;
         else return false;
+    }
+
+    protected function getPhpEscape( $var )
+    {
+        return $this->sqlQuote . '.\\' . $this->sDirBase . '\Orm::driver(__CLASS__)->escape(' . $var . ').' . $this->sqlQuote;
     }
 
     protected function getPhpType( $aCol )
