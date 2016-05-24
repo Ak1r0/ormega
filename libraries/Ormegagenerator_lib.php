@@ -419,6 +419,7 @@ class EntitiesCollection implements \ArrayAccess, \Iterator {
      * Execute a function on every elements
      *
      * @param string $sMethodName Method name
+     * @pararm array $aArgs Method arguments
      *
      * @return array
      *
@@ -427,11 +428,36 @@ class EntitiesCollection implements \ArrayAccess, \Iterator {
     public function __call( $sMethodName, array $aArgs = array() )
     {
         $aReturn = array();
+        
         foreach ( $this->aEntities as $oEntity ){
-            if( method_exists($oEntity, $sMethodName) )
+            if( $oEntity instanceof \Ormega\EntitiesCollection ){
+                $aReturn[] = call_user_func_array( array($oEntity, $sMethodName), $aArgs);
+            }
+            elseif( method_exists($oEntity, $sMethodName) )
                 $aReturn[ $oEntity->getPkId() ] = call_user_func_array( array($oEntity, $sMethodName), $aArgs);
         }
         return $aReturn;
+    }
+        
+    /**
+     * Check if value is correct to be setted in this collection
+     * It must be an array (possibly of array of array...) of \Ormega\EntityInterface
+     *
+     * @param mixed $value
+     *
+     * @return bool true if valid
+     * @throws \InvalidArgumentException If unvalid
+     *
+     * @author ' . __CLASS__ . '
+     */
+    protected function validSetter( $value )
+    {
+        if( $value instanceof \Ormega\EntityInterface || $value instanceof \Ormega\EntitiesCollection ){
+            return true;
+        }
+        else {
+            throw new \InvalidArgumentException("Entity collection expect an \Ormega\EntityInterface as element or an array of \Ormega\EntityInterface");
+        }
     }
 
     /**
@@ -506,7 +532,7 @@ class EntitiesCollection implements \ArrayAccess, \Iterator {
      */
     public function offsetSet($offset, $value) 
     {
-        if( $value instanceof \Ormega\EntityInterface ){             
+        if( $this->validSetter($value) ){             
             if (is_null($offset)) {
                 $this->aEntities[] = & $value;
             } else {
@@ -1017,7 +1043,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     public function set' . $sFuncName . '( $' . $sAttrName . $sDefault . ' )
     {
         if( '.$sTest.' ) {
-            throw new \InvalidArgumentException("Invalid parameter for ".__METHOD__." : (' . $sType . ') excepted ($' . $sAttrName . ') provided");
+            throw new \InvalidArgumentException("Invalid parameter for \"".__METHOD__."\" : (' . $sType . ') expected ; \"$' . $sAttrName . '\" (".gettype($' . $sAttrName . ').") provided");
          }
             
         $this->' . $sAttrName . ' = $' . $sAttrName . ';
