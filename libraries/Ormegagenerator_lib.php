@@ -343,14 +343,16 @@ class Orm {
             }
             self::$aDb[ ucfirst($sDatabase) ] = $aDbDriver;
         }
+        
+        $aDb = self::$aDb;
 
-        spl_autoload_register(function($class){
-            $aPaths = explode("\\\", $class);
+        spl_autoload_register(function($class) use ($aDb){
+            $aPaths = explode("\\", $class);
 
             if( isset($aPaths[0]) && $aPaths[0] == __NAMESPACE__ ) {
 
                 $basepath = __DIR__."/";
-                if( isset($aPaths[1]) && isset( self::$aDb[ $aPaths[1] ] ) ) {
+                if( isset($aPaths[1]) && isset( $aDb[ $aPaths[1] ] ) ) {
                     $basepath = $basepath.$aPaths[1]."/";
     
                     if( isset($aPaths[2]) && is_dir($basepath.$aPaths[2]) ){
@@ -1665,17 +1667,20 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
 
     protected function formatPhpFuncName( $sName )
     {
-        return str_replace(array('-','_'), '', ucwords($sName, '_'));
+        $sName = str_replace('_', ' ', $sName);
+        return str_replace(array('-', ' ',), '', ucwords($sName));
     }
 
     protected function formatPhpForeignFuncName( $sName )
     {
-        return str_replace(array('-','_'), '', ucwords(substr( $sName, 0, strrpos( $sName, '_' ) ), '_'));
+        $sName = str_replace('_', ' ', substr( $sName, 0, strrpos( $sName, '_' ) ) );
+        return str_replace(array('-',' '), '', ucwords($sName));
     }
 
     protected function formatPhpClassName( $sName )
     {
-        return str_replace(array('-','_'), '', ucwords($sName, '_'));
+        $sName = str_replace('_', ' ', $sName);
+        return str_replace(array('-',' '), '', ucwords($sName));
     }
 
     protected function formatPhpAttrName( $sName )
