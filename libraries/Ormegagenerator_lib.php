@@ -347,7 +347,7 @@ class Orm {
         $aDb = self::$aDb;
 
         spl_autoload_register(function($class) use ($aDb){
-            $aPaths = explode("\\", $class);
+            $aPaths = explode("\\\", $class);
 
             if( isset($aPaths[0]) && $aPaths[0] == __NAMESPACE__ ) {
 
