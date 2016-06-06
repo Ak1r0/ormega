@@ -110,6 +110,18 @@ class Ormegagenerator_lib
             'erase'   => true,
         );
 
+        $this->aFiles[] = array(
+            'file'    => $this->sDirBase . '/CacheInterface.php',
+            'content' => $this->genCacheInterface(),
+            'erase'   => true,
+        );
+
+        $this->aFiles[] = array(
+            'file'    => $this->sDirBase . '/Simucache.php',
+            'content' => $this->genSimucache(),
+            'erase'   => true,
+        );
+
         foreach ( $this->aDb as $sDatabase => $aDb ) {
 
             $this->db = $aDb['db'];
@@ -304,6 +316,11 @@ class Orm {
      * @var array $aDb array of CI_DB_driver
      */
     protected static $aDb;
+    
+    /**
+     * @var \Ormega\CacheInterface Cache driver
+     */
+    protected static $oCache;
 
      /**
      * Get the database driver set in the init() method
@@ -332,20 +349,21 @@ class Orm {
      * @param array $aDb Array of CI_DB_driver objects
      * @return void
      *
-     * @author ' . __CLASS__ . '
+     * @author Ormegagenerator_lib
      */
-    public static function init(array $aDb)
+     public static function init(array $aDb, \Ormega\CacheInterface $oCache = null)
     {
-        self::$aDb = array();
-        foreach ( $aDb as $sDatabase => $aDbDriver ) {
-            if ( !is_a($aDbDriver, "CI_DB_driver") ) {
-                throw new \\InvalidArgumentException("Array of CI_DB_driver objects expected for " . __METHOD__);
-            }
-            self::$aDb[ ucfirst($sDatabase) ] = $aDbDriver;
-        }
-        
-        $aDb = self::$aDb;
 
+        /* --------------------------------------------------------
+         * DATABASE
+         * --------------------------------------------------------
+         */
+        $aDb = self::setDatabase($aDb);
+
+        /* --------------------------------------------------------
+         * AUTOLOADER
+         * --------------------------------------------------------
+         */
         spl_autoload_register(function($class) use ($aDb){
             $aPaths = explode("\\\", $class);
 
@@ -369,6 +387,49 @@ class Orm {
                 }
             }
         });
+
+        /* --------------------------------------------------------
+         * CACHE
+         * --------------------------------------------------------
+         */
+        self::setCache($oCache);
+    }
+
+    /**
+     * Initiate database driver
+     *
+     * @param array $aDb Array of CI_DB_driver objects
+     * @return void
+     *
+     * @author Ormegagenerator_lib
+     */
+    protected static function setDatabase(array $aDb)
+    {
+        self::$aDb = array();
+        foreach ( $aDb as $sDatabase => $aDbDriver ) {
+            if ( !is_a($aDbDriver, "CI_DB_driver") ) {
+                throw new \InvalidArgumentException("Array of CI_DB_driver objects expected for " . __METHOD__);
+            }
+            self::$aDb[ ucfirst($sDatabase) ] = $aDbDriver;
+        }
+
+        return self::$aDb;
+    }
+
+    /**
+     * Initiate cache driver
+     *
+     * @param \Ormega\CacheInterface|null $oCache
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
+    protected static function setCache(\Ormega\CacheInterface $oCache = null)
+    {
+        if( !is_null($oCache) ) {
+            self::$oCache = $oCache;
+        } else {
+            self::$oCache = new Simucache();
+        }
     }
 }
 ';
@@ -624,6 +685,88 @@ interface QueryInterface {
 namespace ' . $this->sDirBase . ';
 
 interface EnumInterface {
+}
+';
+    }
+
+    protected function genCacheInterface() {
+        return '<?php
+
+namespace ' . $this->sDirBase . ';
+
+/**
+ * Interface CacheInterface
+ *
+ * @package Ormega
+ */
+interface CacheInterface
+{
+    /**
+     * Get stored data
+     *
+     * @param  string $sKey Unique cache ID
+     *
+     * @return mixed           Data stored
+     */
+    public function get( $sKey );
+
+    /**
+     * Store data into cache
+     *
+     * @param  string $sKey  Unique cache ID
+     * @param  mixed  $mData Data to store
+     * @param  int    $nTime Stored data lifetime (seconds)
+     *
+     * @return boolean       True if data successfully stored
+     */
+    public function save( $sKey, $mData, $nTime );
+}
+';
+    }
+
+    protected function genSimucache() {
+        return '<?php
+
+namespace ' . $this->sDirBase . ';
+
+/**
+ * Simulate a cache system if no one provided
+ *
+ * @package  Ormega
+ */
+class Simucache implements \Ormega\CacheInterface {
+
+    /**
+     * @var array Data store
+     */
+    protected $aData = array();
+
+    /**
+     * Get stored data
+     *
+     * @param  string $sKey Unique cache ID
+     *
+     * @return mixed           Data stored
+     */
+    public function get($sKey)
+    {
+        return isset( $this->aData[$sKey] )? $this->aData[$sKey] : null;
+    }
+
+    /**
+     * Store data into cache
+     *
+     * @param  string $sKey  Unique cache ID
+     * @param  mixed  $mData Data to store
+     * @param  int    $nTime Stored data lifetime (seconds)
+     *
+     * @return boolean       True if data successfully stored
+     */
+    public function save( $sKey, $aData, $nTime )
+    {
+        $this->$aData[ $sKey ] = $aData;
+        return true;
+    }
 }
 ';
     }
