@@ -322,7 +322,7 @@ class Orm {
      */
     protected static $oCache;
 
-     /**
+    /**
      * Get the database driver set in the init() method
      *
      * @param string $sClassName Classname of the calling class, used to determine which connection use in case of multiple database connections
@@ -342,6 +342,16 @@ class Orm {
     }
     
     /**
+     * Get the cache driver set in the init() method
+     * 
+     * @return \Ormega\CacheInterface
+     */
+    public static function cache()
+    {
+        return self::$oCache;
+    }
+    
+    /**
      * Initiate the orm with a database connection (can be adapted to any driver
      *      as long as it implement the \Ormega\DbInterface interface).
      * Define an autoload for all Ormega generated classes
@@ -349,9 +359,9 @@ class Orm {
      * @param array $aDb Array of CI_DB_driver objects
      * @return void
      *
-     * @author Ormegagenerator_lib
+     * @author ' . __CLASS__ . '
      */
-     public static function init(array $aDb, \Ormega\CacheInterface $oCache = null)
+    public static function init(array $aDb, \Ormega\CacheInterface $oCache = null)
     {
 
         /* --------------------------------------------------------
@@ -401,7 +411,7 @@ class Orm {
      * @param array $aDb Array of CI_DB_driver objects
      * @return void
      *
-     * @author Ormegagenerator_lib
+     * @author ' . __CLASS__ . '
      */
     protected static function setDatabase(array $aDb)
     {
@@ -421,7 +431,7 @@ class Orm {
      *
      * @param \Ormega\CacheInterface|null $oCache
      *
-     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     * @author ' . __CLASS__ . '
      */
     protected static function setCache(\Ormega\CacheInterface $oCache = null)
     {
@@ -762,9 +772,9 @@ class Simucache implements \Ormega\CacheInterface {
      *
      * @return boolean       True if data successfully stored
      */
-    public function save( $sKey, $aData, $nTime )
+    public function save( $sKey, $mData, $nTime )
     {
-        $this->$aData[ $sKey ] = $aData;
+        $this->aData[ $sKey ] = $mData;
         return true;
     }
 }
@@ -1561,9 +1571,19 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
 
         $aReturn = new \Ormega\EntitiesCollection();
 
-        $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
+        \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
             ->select(' . $this->sqlQuote . implode(',', $aColumns) . $this->sqlQuote . ')
-            ->get(' . $this->sqlQuote . $this->db->database .'.'. $sTable . $this->sqlQuote . ');
+            ->from(' . $this->sqlQuote . $this->db->database .'.'. $sTable . $this->sqlQuote . ');
+           
+        $sQueryCacheId = base64_encode( \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->get_compiled_select(null, false) );
+        
+        if( \\' . $this->sDirBase . '\Orm::cache()->get($sQueryCacheId) ){        
+            \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->reset_query();
+            $query = \\' . $this->sDirBase . '\Orm::cache()->get($sQueryCacheId);
+        } else {
+            $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->get();
+            \\' . $this->sDirBase . '\Orm::cache()->save($sQueryCacheId, $query, 3600);
+        }
         
         foreach( $query->result() as $row ){
             
@@ -1572,8 +1592,6 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
                 . '\\' . $this->sDirEntity
                 . '\\'.$sClassName.'();
             ';
-
-        $aIdentifier = array();
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
 
