@@ -1,0 +1,11 @@
+{
+    "name": "4k1r0/ormegatest",
+    "version": "1.0.0",
+    "description": "",
+    "license": "MIT",
+    "require": {
+        "php": ">=5.3.0",
+        "codeigniter/framework": "3.0.6",
+        "4k1r0/ormega": "dev-CI"
+    }
+}
