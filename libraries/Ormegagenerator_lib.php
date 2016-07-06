@@ -397,12 +397,6 @@ class Orm {
                 }
             }
         });
-
-        /* --------------------------------------------------------
-         * CACHE
-         * --------------------------------------------------------
-         */
-        self::setCache($oCache);
     }
 
     /**
@@ -433,7 +427,7 @@ class Orm {
      *
      * @author ' . __CLASS__ . '
      */
-    protected static function setCache(\Ormega\CacheInterface $oCache = null)
+    public static function setCacheDriver(\Ormega\CacheInterface $oCache = null)
     {
         if( !is_null($oCache) ) {
             self::$oCache = $oCache;
@@ -730,6 +724,15 @@ interface CacheInterface
      * @return boolean       True if data successfully stored
      */
     public function save( $sKey, $mData, $nTime );
+        
+    /**
+     * Delete stored data
+     *
+     * @param  string $sKey  Unique cache ID
+     *
+     * @return boolean       True if data successfully stored
+     */
+    public function delete( $sKey );
 }
 ';
     }
@@ -760,7 +763,7 @@ class Simucache implements \Ormega\CacheInterface {
      */
     public function get($sKey)
     {
-        return isset( $this->aData[$sKey] )? $this->aData[$sKey] : null;
+        return isset( $this->aData[$sKey] )? $this->aData[$sKey] : false;
     }
 
     /**
@@ -776,6 +779,20 @@ class Simucache implements \Ormega\CacheInterface {
     {
         $this->aData[ $sKey ] = $mData;
         return true;
+    }    
+    
+    /**
+     * Delete stored data
+     *
+     * @param  string $sKey  Unique cache ID
+     *
+     * @return boolean       True if data successfully stored
+     */
+    public function delete( $sKey )
+    {
+        if( isset($this->aData[ $sKey ]) ){
+            unset( $this->aData[ $sKey ] );
+        }
     }
 }
 ';
@@ -809,7 +826,7 @@ class Simucache implements \Ormega\CacheInterface {
 
         $aConstants = array();
         foreach ( $query->result_array() as $aData ) {
-            $aData['constant'] = strtoupper( preg_replace($pattern, '', $aData['constant']) );
+            $aData['constant'] = $this->formatPhpAttrName(strtoupper( preg_replace($pattern, '', $aData['constant']) ));
             $aConstants[] = $aData;
         }
 
@@ -825,7 +842,7 @@ class ' . $sClassName . ' implements \Ormega\EnumInterface {
     /**
      * @var int ' . $aConstant['label'] . '
      */
-    const ' . strtoupper($aConstant['constant']) . ' = ' . $aConstant['id'] . ';';
+    const ' . $aConstant['constant'] . ' = ' . $aConstant['id'] . ';';
         }
 
         $php .= '
@@ -974,6 +991,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
      * @var bool $_isModified for intern usage : let know the class if data changed from last save
      */
     protected $_isModified;
+    
+    protected $_aCacheReference = array();
 ';
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
             $php .= $this->genAttribute($aCol);
@@ -1016,9 +1035,24 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     {
         if (!is_null($bModified) && is_bool($bModified)) {
             $this->_isModified = $bModified;
+            if( $bModified ){
+                foreach( $this->_aCacheReference as $sCacheKey ){
+                    \\' . $this->sDirBase . '\Orm::cache()->delete($sCacheKey);
+                }
+            }
         }
 
         return $this->_isModified;
+    }
+    
+    public function addCacheRef( $sCacheRef )
+    {
+        $this->_aCacheReference[ $sCacheRef ] = true; 
+    }
+    
+    public function cacheKey()
+    {
+        return __CLASS__.$this->getPkId();
     }
     
     /**
@@ -1030,7 +1064,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
      * @abstracted \Ormega\EntityInterface
      * @author ' . __CLASS__ . '
      */
-    public function getPkId(){
+    public function getPkId()
+    {
         return (string)'.implode('."-".', $aPks).';
     }
     
@@ -1069,7 +1104,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     public function __construct()
     {       
         $this->_isLoadedFromDb  = false;
-        $this->_isModified      = false;
+        $this->modified(false);
     }';
 
         return $php;
@@ -1202,7 +1237,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
          }
             
         $this->' . $sAttrName . ' = $' . $sAttrName . ';
-        $this->_isModified = true;
+        $this->modified(true);
         
         return $this;
     }';
@@ -1235,7 +1270,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     {
         $this->' . $sObjAttrName . ' = $' . $sObjAttrName . ';
         $this->' . $sAttrName . ' = $' . $sObjAttrName . '->get' . $sReferencedAttr . '();
-        $this->_isModified = true;
+        $this->modified(true);
         
         return $this;
     }';
@@ -1276,7 +1311,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         }
 
         $php .= '        
-        if( $this->_isModified && $return ){ 
+        if( $this->modified() && $return ){ 
         ';
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
@@ -1310,7 +1345,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
             }
             
             if( $return ){ 
-                $this->_isModified = false;
+                $this->modified(false);
             }
         }
         
@@ -1567,31 +1602,32 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
      * @return \Ormega\EntitiesCollection
      * @author '.__CLASS__.'
      */
-    public function find(){
-
+    public function find()
+    {
         $aReturn = new \Ormega\EntitiesCollection();
-
+            
         \\' . $this->sDirBase . '\Orm::driver(__CLASS__)
             ->select(' . $this->sqlQuote . implode(',', $aColumns) . $this->sqlQuote . ')
             ->from(' . $this->sqlQuote . $this->db->database .'.'. $sTable . $this->sqlQuote . ');
            
-        $sQueryCacheId = base64_encode( \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->get_compiled_select(null, false) );
+        $sQueryCacheId = md5( \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->get_compiled_select(null, false) );
         
-        if( \\' . $this->sDirBase . '\Orm::cache()->get($sQueryCacheId) ){        
-            \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->reset_query();
-            $query = \\' . $this->sDirBase . '\Orm::cache()->get($sQueryCacheId);
-        } else {
-            $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->get();
-            \\' . $this->sDirBase . '\Orm::cache()->save($sQueryCacheId, $query, 3600);
+        if( $aCacheRef = \\' . $this->sDirBase . '\Orm::cache()->get($sQueryCacheId) AND is_array($aCacheRef) ){    
+            foreach( $aCacheRef as $sCacheRef ){
+                $obj = \\' . $this->sDirBase . '\Orm::cache()->get($sCacheRef);
+                $aReturn[ $obj->getPkId() ] = $obj;
+            }       
         }
-        
-        foreach( $query->result() as $row ){
-            
-            $obj = new \\' . $this->sDirBase
-                . '\\' . $this->sDatabase
-                . '\\' . $this->sDirEntity
-                . '\\'.$sClassName.'();
-            ';
+        else {
+            $aCacheRef = array();
+            $query = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->get();            
+            foreach( $query->result() as $row ){
+                
+                $obj = new \\' . $this->sDirBase
+                    . '\\' . $this->sDatabase
+                    . '\\' . $this->sDirEntity
+                    . '\\'.$sClassName.'();
+                ';
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
 
@@ -1600,24 +1636,29 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
 
             if( $this->isNull($aCol) ){
                 $php .= '
-            if( !is_null($row->' . $aCol['Field'] . ') ){
-                $obj->set' . $sFuncName . '((' . $sType . ') $row->' . $aCol['Field'] . ');
-            }';
+                if( !is_null($row->' . $aCol['Field'] . ') ){
+                    $obj->set' . $sFuncName . '((' . $sType . ') $row->' . $aCol['Field'] . ');
+                }';
 
             } else {
                 $php .= '
-            $obj->set' . $sFuncName . '((' . $sType . ') $row->' . $aCol['Field'] . ');';
+                $obj->set' . $sFuncName . '((' . $sType . ') $row->' . $aCol['Field'] . ');';
             }
         }
 
-
-
         $php .= '
-            $obj->loaded(true);
-            $obj->modified(false);
-            
-            $aReturn[ $obj->getPkId() ] = $obj;
+                $obj->addCacheRef($sQueryCacheId);
+                $obj->loaded(true);
+                $obj->modified(false);
+                
+                $aReturn[ $obj->getPkId() ] = $obj;
+                \\' . $this->sDirBase . '\Orm::cache()->save($obj->cacheKey(), $obj, 3600);
+                $aCacheRef[] = $obj->cacheKey();
+            }            
+            \\' . $this->sDirBase . '\Orm::cache()->save($sQueryCacheId, $aCacheRef, 3600);
         }
+            
+        \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->reset_query();
 
         return $aReturn;
     }';
@@ -1846,6 +1887,9 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
 
     protected function formatPhpAttrName( $sName )
     {
+        if( is_numeric(substr($sName, 0, 1)) ){
+            $sName = '_'.$sName;
+        }
         return $sName;
     }
 
