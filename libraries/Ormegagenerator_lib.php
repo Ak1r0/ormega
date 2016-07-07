@@ -822,30 +822,119 @@ class Simucache implements \Ormega\CacheInterface {
         $pattern = '/([^\w])/';
         $sClassName = $this->formatPhpClassName($sTable);
 
-        $query = $this->db->query("SELECT id, label, constant FROM `$sTable`");
+        /*
+         * Find the constant field
+         */
+        if( isset($this->aCols[$sTable]['constant']) ){
+            $sConstantField = $this->aCols[$sTable]['constant']['Field'];
+        } else {
+            reset($this->aCols[$sTable]);
+            // Go to the first string field
+            while( $this->getPhpType( current($this->aCols[$sTable]) ) != 'string' && each($this->aCols[$sTable]) );
+            if( current($this->aCols[$sTable]) ){
+                $sConstantField = current($this->aCols[$sTable])['Field'];
+            } else {
+                $this->output('No constant field found for the table `'.$sTable.'`');
+                return '';
+            }
+        }
 
-        $aConstants = array();
+        /*
+         * Get data from bdd
+         */
+        $aFields = array();
+        foreach ($this->aCols[$sTable] as $aCol){
+            $aFields[] = $aCol['Field'];
+        }
+
+        $query = $this->db->query("SELECT ".implode(',',$aFields)." FROM `$sTable`");
+
+        $aTableData = array();
         foreach ( $query->result_array() as $aData ) {
-            $aData['constant'] = $this->formatPhpAttrName(strtoupper( preg_replace($pattern, '', $aData['constant']) ));
-            $aConstants[] = $aData;
+            $aData[$sConstantField] = $this->formatPhpAttrName(
+                strtoupper( preg_replace($pattern, '', $aData[$sConstantField]) )
+            );
+
+            $aTableData[] = $aData;
         }
 
         $php = '<?php 
         
 namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEnum . ';
 
-class ' . $sClassName . ' implements \Ormega\EnumInterface {
-';
-        foreach ( $aConstants as $aConstant ) {
+class ' . $sClassName . ' implements \Ormega\EnumInterface {';
+        
+        foreach ( $aTableData as $aConstant ) {
+            $php .= '
+    
+    /** 
+     * @var int ' . (!empty($aConstant['label'])?$aConstant['label']:'') . '
+     */
+    const ' . $aConstant[$sConstantField] . ' = ' . $aConstant['id'] . ';';
+        }
+
+        foreach( $this->aCols[$sTable] as $aCol ){
+
+            // Do not create special method for the prim key
+            // as it'll be referenced by the constant
+            if($aCol['Field'] == 'id'){
+                continue;
+            }
+
             $php .= '
     
     /**
-     * @var int ' . $aConstant['label'] . '
+     * Get the "'.$this->formatPhpFuncName($aCol['Field']).'" associated to an ID
+     * @param int $nId
+     * @return '.$this->getPhpType($aCol).'
+     * @author ' . __CLASS__ . '
      */
-    const ' . $aConstant['constant'] . ' = ' . $aConstant['id'] . ';';
+    public static function get'.$this->formatPhpFuncName($aCol['Field']).'( $nId )
+    {
+        $aValues = array(';
+            foreach ($aTableData as $aRowData){
+                foreach ($aRowData as $sField => $mValue){
+                    if( $aCol['Field'] == $sField ) {
+                        $php .= '
+            '.$aRowData['id'] . ' => "' . addslashes($mValue) . '",';
+                    }
+                }
+            }
+            $php .= '
+        );
+        
+        return isset($aValues[ $nId ])? $aValues[ $nId ] : null;
+    }
+            ';
+
         }
 
         $php .= '
+        
+    /**
+     * Get all the constants in a array form
+     * @return array
+     * @author ' . __CLASS__ . '
+     */
+    public static function getArray()
+    {
+        return array(';
+
+        foreach ($aTableData as $aRowData){
+            $php .= '
+            "' . $aRowData[$sConstantField] . '" => array(';
+            foreach ($aRowData as $sField => $mValue){
+                    $php .= '
+                "'.$sField . '" => "' . addslashes($mValue) . '",';
+
+            }
+            $php .= '
+            ),';
+        }
+
+        $php .= '
+        );
+    }    
     
     /**
      * Get an ID from a string constant
@@ -857,10 +946,10 @@ class ' . $sClassName . ' implements \Ormega\EnumInterface {
     {
         switch( strtoupper($sConstant) ){';
 
-        foreach ( $aConstants as $aConstant ) {
+        foreach ( $aTableData as $aConstant ) {
             $php .= '
-            case "'. $aConstant['constant'] .'":
-                return self::'. $aConstant['constant'] .';
+            case "'. $aConstant[$sConstantField] .'":
+                return self::'. $aConstant[$sConstantField] .';
                 break;';
         }
 
@@ -868,64 +957,6 @@ class ' . $sClassName . ' implements \Ormega\EnumInterface {
             default:
                 return 0;
         }
-    }
-    
-    /**
-     * Get all the constants in a array form
-     * @return array
-     * @author ' . __CLASS__ . '
-     */
-    public static function getArray()
-    {
-        return array(
-            ';
-
-        foreach ( $aConstants as $aConstant ) {
-            $php .= '"' . $aConstant['constant'] . '" => array("id"=>"' . $aConstant['id'] . '", "label"=>"' . $aConstant['label'] . '", "constant"=>"' . $aConstant['constant'] . '"),';
-        }
-
-        $php .= '
-        );
-    }    
-    
-    /**
-     * The label (description) associated with one ID
-     * @param int $nId Constant ID
-     * @return string
-     * @author ' . __CLASS__ . '
-     */
-    public static function getLabel( $nId ){
-        
-        $aLabels = array(';
-
-        foreach ( $aConstants as $aConstant ) {
-            $php .= '
-            '.$aConstant['id'] . ' => "' . $aConstant['label'] .'",';
-        }
-        $php .= '
-        );
-        
-        return isset($aLabels[ $nId ])? $aLabels[ $nId ] : "";
-    }
-    
-    /**
-     * The constant string associated with one ID
-     * @param int $nId Constant ID
-     * @return string
-     * @author ' . __CLASS__ . '
-     */
-    public static function getConstant( $nId ){
-        
-        $aConstants = array(';
-
-        foreach ( $aConstants as $aConstant ) {
-            $php .= '
-            '.$aConstant['id'] . ' => "' . $aConstant['constant'] .'",';
-        }
-        $php .= '
-        );
-        
-        return isset($aConstants[ $nId ])? $aConstants[ $nId ] : "";
     }
 }';
 
