@@ -61,6 +61,25 @@ class Enumrole implements \Ormega\EnumInterface {
         return isset($aValues[ $nId ])? $aValues[ $nId ] : null;
     }
             
+    
+    /**
+     * Get the "Test" associated to an ID
+     * @param int $nId
+     * @return string
+     * @author Ormegagenerator_lib
+     */
+    public static function getTest( $nId )
+    {
+        $aValues = array(
+            1 => "",
+            2 => "sdfsf",
+            3 => "",
+            4 => "r515",
+        );
+        
+        return isset($aValues[ $nId ])? $aValues[ $nId ] : null;
+    }
+            
         
     /**
      * Get all the constants in a array form
@@ -74,21 +93,25 @@ class Enumrole implements \Ormega\EnumInterface {
                 "id" => "1",
                 "label" => "Admin\"",
                 "constant" => "ADFMIN",
+                "test" => "",
             ),
             "VIP" => array(
                 "id" => "2",
                 "label" => "V.I.P.",
                 "constant" => "VIP",
+                "test" => "sdfsf",
             ),
             "USER" => array(
                 "id" => "3",
                 "label" => "Utilisateur",
                 "constant" => "USER",
+                "test" => "",
             ),
             "_55TEST" => array(
                 "id" => "4",
                 "label" => "test",
                 "constant" => "_55TEST",
+                "test" => "r515",
             ),
         );
     }    

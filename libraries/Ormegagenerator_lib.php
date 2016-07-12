@@ -357,6 +357,8 @@ class Orm {
      * Define an autoload for all Ormega generated classes
      *
      * @param array $aDb Array of CI_DB_driver objects
+     * @param \Ormega\CacheInterface|null $oCache
+     
      * @return void
      *
      * @author ' . __CLASS__ . '
@@ -397,6 +399,12 @@ class Orm {
                 }
             }
         });
+        
+        /* --------------------------------------------------------
+         * CACHE
+         * --------------------------------------------------------
+         */
+        self::setCacheDriver($oCache);
     }
 
     /**
@@ -427,7 +435,7 @@ class Orm {
      *
      * @author ' . __CLASS__ . '
      */
-    public static function setCacheDriver(\Ormega\CacheInterface $oCache = null)
+    protected static function setCacheDriver(\Ormega\CacheInterface $oCache = null)
     {
         if( !is_null($oCache) ) {
             self::$oCache = $oCache;

@@ -30,13 +30,18 @@ class Welcome extends CI_Controller {
 	 */
 	public function index()
 	{
-		$this->db_test1  = $this->load->database('localtest1', true);
+		$this->db_test1  = $this->load->database('default', true);
 
         $aInit = array(
-            'test1' => $this->db_test1,
-            'test2'  => $this->db_test2
+            'Mydb' => $this->db_test1
         );
 
-        Ormega\Orm::init($aInit); // Le init doit se faire avant le load de la librairie Session !
+        \Ormega\Orm::init($aInit); // Le init doit se faire avant le load de la librairie Session !
+		
+		
+		$oUsersList = \Ormega\Mydb\Query\User::create()
+			->find();
+
+		var_dump($oUsersList);
 	}
 }

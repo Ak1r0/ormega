@@ -91,7 +91,7 @@ class Orm {
                 $basepath = __DIR__."/";
                 if( isset($aPaths[1]) && isset( $aDb[ $aPaths[1] ] ) ) {
                     $basepath = $basepath.$aPaths[1]."/";
-    
+
                     if( isset($aPaths[2]) && is_dir($basepath.$aPaths[2]) ){
                         $basepath = $basepath.$aPaths[2]."/";
     
@@ -106,6 +106,12 @@ class Orm {
                 }
             }
         });
+
+        /* --------------------------------------------------------
+         * CACHE
+         * --------------------------------------------------------
+         */
+        self::setCacheDriver($oCache);
     }
 
     /**
@@ -136,7 +142,7 @@ class Orm {
      *
      * @author Ormegagenerator_lib
      */
-    public static function setCacheDriver(\Ormega\CacheInterface $oCache = null)
+    protected static function setCacheDriver(\Ormega\CacheInterface $oCache = null)
     {
         if( !is_null($oCache) ) {
             self::$oCache = $oCache;
