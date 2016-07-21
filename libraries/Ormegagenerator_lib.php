@@ -840,7 +840,8 @@ class Simucache implements \Ormega\CacheInterface {
             // Go to the first string field
             while( $this->getPhpType( current($this->aCols[$sTable]) ) != 'string' && each($this->aCols[$sTable]) );
             if( current($this->aCols[$sTable]) ){
-                $sConstantField = current($this->aCols[$sTable])['Field'];
+                $aTemp = current($this->aCols[$sTable]);
+                $sConstantField = $aTemp['Field'];
             } else {
                 $this->output('No constant field found for the table `'.$sTable.'`');
                 return '';
