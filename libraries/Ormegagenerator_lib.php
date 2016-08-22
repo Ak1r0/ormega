@@ -244,15 +244,22 @@ class Ormegagenerator_lib
         $query = $this->db->query(
             "SELECT COLUMN_NAME, CONSTRAINT_NAME, REFERENCED_COLUMN_NAME, REFERENCED_TABLE_NAME
                   FROM information_schema.KEY_COLUMN_USAGE
-                  WHERE TABLE_NAME = '$sTable'"
+                  WHERE (CONSTRAINT_NAME = 'PRIMARY' 
+                      OR ( 
+                        REFERENCED_COLUMN_NAME IS NOT NULL
+                        AND REFERENCED_TABLE_NAME IS NOT NULL
+                      )
+                    )
+                    AND TABLE_SCHEMA = '".$this->db->database."'
+                    AND TABLE_NAME = '$sTable'"
         );
+        
         foreach ( $query->result_array() as $aKey ) {
             if( isset($this->aCols[ $sTable ][ $aKey['COLUMN_NAME'] ]) ) {
                 $this->aKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
                 if ( $aKey['CONSTRAINT_NAME'] == 'PRIMARY' )
                     $this->aPrimaryKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
-
-                if ( $this->isGenerableForeignKey($sTable, $this->aCols[ $sTable ][ $aKey['COLUMN_NAME'] ]) )
+                if( $this->isGenerableForeignKey($sTable, $aKey) )
                     $this->aForeignKeys[ $sTable ][ $aKey['COLUMN_NAME'] ] = $aKey;
             }
         }
@@ -263,20 +270,25 @@ class Ormegagenerator_lib
      * and if we can map it with an Entity object of the referenced table
      *
      * @param string $sTable Table name
-     * @param array $aCol Sql column infos
+     * @param array $aKey Indexes : COLUMN_NAME, CONSTRAINT_NAME, REFERENCED_COLUMN_NAME, REFERENCED_TABLE_NAME
      *
      * @return bool
      *
      * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
      */
-    protected function isGenerableForeignKey( $sTable, array $aCol )
+    protected function isGenerableForeignKey( $sTable, array $aKey )
     {
         return
-            isset($this->aKeys[ $sTable ][ $aCol['Field'] ])
-            && !empty($this->aKeys[ $sTable ][ $aCol['Field'] ]['REFERENCED_COLUMN_NAME'])
-            && !empty($this->aKeys[ $sTable ][ $aCol['Field'] ]['REFERENCED_TABLE_NAME'])
-            && !isset($this->aPrimaryKeys[ $sTable ][ $aCol['Field'] ])
-            && strpos($aCol['Field'], 'enum') === false;
+            !empty($aKey['REFERENCED_COLUMN_NAME'] )
+            && !empty($aKey['REFERENCED_TABLE_NAME'])
+            // Not a primary key
+            && !isset($this->aPrimaryKeys[ $sTable ][ $aKey['COLUMN_NAME'] ])
+            // Not a already foreign key
+            && !isset($this->aForeignKeys[ $sTable ][ $aKey['COLUMN_NAME'] ])
+            // Fk name not already exists as normal column name
+            && !isset($this->aCols[ $sTable ][ $this->formatPhpForeignAttrName($aKey['COLUMN_NAME']) ])
+            && strpos($aKey['COLUMN_NAME'], 'enum') === false // Dont refer to an enum table
+            ;
     }
 
     /**
@@ -1015,7 +1027,12 @@ class ' . $sClassName . ' extends ' . $this->sDirPrivate . '\\' . $sClassName . 
     protected function genFileEntityPrivate( $sTable )
     {
         $sClassName = $this->formatPhpClassName($sTable);
-
+        
+        $aPks = array();
+        foreach ($this->aPrimaryKeys[ $sTable ] as $aPk) {
+            $aPks[] = '$this->get'.$this->formatPhpFuncName($aPk['COLUMN_NAME']).'()';
+        }
+        
         $php = '<?php 
         
 namespace ' . $this->sDirBase . '\\' . $this->sDatabase . '\\' . $this->sDirEntity . '\\' . $this->sDirPrivate . ';
@@ -1040,11 +1057,6 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
 
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
             $php .= $this->genForeignAttribute($sTable, $this->aCols[ $sTable ][ $sKeyName ]);
-        }
-
-        $aPks = array();
-        foreach ($this->aPrimaryKeys[ $sTable ] as $aPk) {
-            $aPks[] = '$this->get'.$this->formatPhpFuncName($aPk['COLUMN_NAME']).'()';
         }
 
         $php .= $this->genConstructor($sClassName);
@@ -1106,10 +1118,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
      */
     public function getPkId()
     {
-        return (string)'.implode('."-".', $aPks).';
-    }
-    
-    ';
+        return (string)'.(!empty($aPks) ? implode('."-".', $aPks) : 'uniqid("", true)').';
+    }';
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
             $php .= $this->genGetter($aCol);
@@ -1168,8 +1178,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     public function genForeignAttribute( $sTable, array $aCol )
     {
         $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
-        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
-
+        $sObjAttrName = $this->formatPhpForeignAttrName($aFK['COLUMN_NAME']);
+        
         $sType = '\\' . $this->sDirBase
             . '\\' . $this->sDatabase
             . '\\' . $this->sDirEntity
@@ -1208,9 +1218,9 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     {
         $aFK = $this->aKeys[ $sTable ][ $aCol['Field'] ];
 
-        $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
-        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
-
+        $sObjAttrName = $this->formatPhpForeignAttrName($aFK['COLUMN_NAME']);
+        $sObjFuncName = $this->formatPhpFuncName($sObjAttrName);
+        
         $sType = '\\' . $this->sDirBase
             . '\\' . $this->sDatabase
             . '\\' . $this->sDirEntity
@@ -1289,9 +1299,9 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     {
         $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
 
-        $sObjFuncName = $this->formatPhpForeignFuncName($aCol['Field']);
-        $sObjAttrName = $this->formatPhpForeignAttrName($aCol['Field']);
-
+        $sObjAttrName = $this->formatPhpForeignAttrName($aFK['COLUMN_NAME']);
+        $sObjFuncName = $this->formatPhpFuncName($sObjAttrName);
+        
         $sType = '\\' . $this->sDirBase
             . '\\' . $this->sDatabase
             . '\\' . $this->sDirEntity
@@ -1321,6 +1331,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
     protected function genSave( $sTable )
     {
         $aUpdateWhere = array();
+        $sPrimaryPhpName = '';
         foreach ( $this->aPrimaryKeys[ $sTable ] as $aPrimaryKey ) {
             $sPrimaryName = $aPrimaryKey['COLUMN_NAME'];
             $sPrimaryPhpName = $this->formatPhpAttrName($sPrimaryName);
@@ -1343,7 +1354,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         ';
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
 
-            $sObjAttrName = $this->formatPhpForeignAttrName( $aKey['COLUMN_NAME'] );
+            $sObjAttrName = $this->formatPhpForeignAttrName($aKey['COLUMN_NAME']);
 
             $php .= '
         $return = $return && (!$this->' . $sObjAttrName . ' || $this->' . $sObjAttrName . '->save());
@@ -1372,12 +1383,17 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
             }
         }
 
-         $php .= ' 
+        $php .= ' 
          
             if( !$this->_isLoadedFromDb ){ 
                 $return = $return && \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert('. $this->sqlQuote . $sTable . $this->sqlQuote .'); 
-                $this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert_id();
-                $this->_isLoadedFromDb = true;
+                $this->_isLoadedFromDb = true;';
+        if( !empty($sPrimaryPhpName) ) {
+            $php .=
+                '$this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert_id();';
+        }
+        
+        $php .= '
             }
             else {
                 \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->where('. $this->sqlQuote . implode(' AND ', $aUpdateWhere) . $this->sqlQuote .');
@@ -1911,12 +1927,6 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
     {
         $sName = str_replace('_', ' ', $sName);
         return str_replace(array('-', ' ',), '', ucwords($sName));
-    }
-
-    protected function formatPhpForeignFuncName( $sName )
-    {
-        $sName = str_replace('_', ' ', substr( $sName, 0, strrpos( $sName, '_' ) ) );
-        return str_replace(array('-',' '), '', ucwords($sName));
     }
 
     protected function formatPhpClassName( $sName )
