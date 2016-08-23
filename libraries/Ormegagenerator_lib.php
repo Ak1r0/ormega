@@ -1389,8 +1389,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
                 $return = $return && \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert('. $this->sqlQuote . $sTable . $this->sqlQuote .'); 
                 $this->_isLoadedFromDb = true;';
         if( !empty($sPrimaryPhpName) ) {
-            $php .=
-                '$this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert_id();';
+            $php .= '
+                $this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert_id();';
         }
         
         $php .= '
