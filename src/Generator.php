@@ -51,12 +51,12 @@ class Generator
     public function __construct( array $config )
     {
         if( empty( $config['databases'] ) || !is_array($config['databases']) ){
-            throw new InvalidArgumentException('Array expected for config["tables"]');
+            throw new \InvalidArgumentException('Array expected for config["tables"]');
         }
 
         foreach ( $config['databases'] as $aDbConf ) {
             if ( !is_a($aDbConf['db'], 'Evolution\CodeIgniterDB\CI_DB_driver') ) {
-                throw new InvalidArgumentException('Instance of Evolution\CodeIgniterDB\CI_DB_driver needed to start 
+                throw new \InvalidArgumentException('Instance of Evolution\CodeIgniterDB\CI_DB_driver needed to start 
                 the model generator');
             }
         }
