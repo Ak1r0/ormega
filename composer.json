@@ -23,8 +23,9 @@
     },
     "autoload": {
         "psr-0": {
-            "Ormega": "src/"
-        }
+            "Ormega\\": "src/"
+        },
+        "files": ["src/Generator.php"]
     },
     "extra": {
         "installer-name": "ormega"
