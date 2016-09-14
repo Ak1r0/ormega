@@ -1,6 +1,6 @@
 {
     "name": "4k1r0/ormega",
-    "type": "codeigniter-third-party",
+    "type": "library",
     "version": "1.0.0",
     "description": "Easy to use ORM",
     "authors": [
