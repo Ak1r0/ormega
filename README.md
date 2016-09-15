@@ -174,7 +174,7 @@ The code generated will look like this
 ```php
 <?php 
         
-namespace Ormega\Mpq\Enum;
+namespace Ormega\Database\Enum;
 
 class Enumgroup implements \Ormega\EnumInterface {
     
