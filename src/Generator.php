@@ -6,8 +6,8 @@ namespace Ormega;
  * Class Ormega\Generator
  *
  * @package  Ormega
- * @category External
- * @version  20160411
+ * @version  20160921
+ *
  */
 class Generator
 {
@@ -1140,6 +1140,17 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
 
         $php .= '
         
+    public function __clone(){';
+        
+        foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
+            $php .= '
+        $this->'.$this->formatPhpForeignAttrName($aKey['COLUMN_NAME'])
+                .' = clone $this->'.$this->formatPhpForeignAttrName($aKey['COLUMN_NAME']).';';
+        }
+        
+        $php .= '
+    }
+        
 }';
 
         return $php;
@@ -1154,7 +1165,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
      * @author ' . __CLASS__ . '
      */
     public function __construct()
-    {       
+    {
         $this->_isLoadedFromDb  = false;
         $this->modified(false);
     }';
@@ -1260,7 +1271,17 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
 
         return $php;
     }
-
+    
+    /**
+     * Generate entities setters
+     *
+     * @param string $sTable Table name
+     * @param array $aCol Array with all table columns
+     *
+     * @return string
+     *
+     * @author Matthieu Dos Santos <m.dossantos@santiane.fr>
+     */
     protected function genSetter( $sTable, array $aCol )
     {
         $sFuncName = $this->formatPhpFuncName($aCol['Field']);
@@ -1279,6 +1300,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         
     /**
      * @param ' . $sType . ' $' . $sAttrName . ' Maxlenght:' . $this->getMaxLength($aCol) . '
+     * @return $this
      * @throw \InvalidArgumentException
      * @author ' . __CLASS__ . '
      */
@@ -1363,8 +1385,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         ';
         }
 
-        $php .= '        
-        if( $this->modified() && $return ){ 
+        $php .= '
+        if( $this->modified() && $return ){
         ';
 
         foreach ( $this->aCols[ $sTable ] as $aCol ) {
@@ -1375,24 +1397,26 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
 
             if( !$this->isNull($aCol) ){
                  $php .= '
+            
             if( !is_null('.$sValue.') ){
                 '.$sSetter.'
             }';
             }
             else {
                 $php .= '
+            
             '.$sSetter;
             }
         }
 
-        $php .= ' 
+        $php .= '
          
-            if( !$this->_isLoadedFromDb ){ 
-                $return = $return && \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert('. $this->sqlQuote . $sTable . $this->sqlQuote .'); 
+            if( !$this->_isLoadedFromDb ){
+                $return = $return && \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert('. $this->sqlQuote . $sTable . $this->sqlQuote .');
                 $this->_isLoadedFromDb = true;';
         if( !empty($sPrimaryPhpName) ) {
-            $php .=
-                '$this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert_id();';
+            $php .= '
+                $this->' . $sPrimaryPhpName . ' = \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->insert_id();';
         }
         
         $php .= '
@@ -1402,7 +1426,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
                 $return = $return && \\' . $this->sDirBase . '\Orm::driver(__CLASS__)->update('. $this->sqlQuote . $sTable . $this->sqlQuote .');
             }
             
-            if( $return ){ 
+            if( $return ){
                 $this->modified(false);
             }
         }
