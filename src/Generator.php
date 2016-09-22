@@ -1284,6 +1284,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
      */
     protected function genSetter( $sTable, array $aCol )
     {
+        $sClassName = $this->formatPhpClassName($sTable);
+        
         $sFuncName = $this->formatPhpFuncName($aCol['Field']);
         $sAttrName = $this->formatPhpAttrName($aCol['Field']);
         $sType     = $this->getPhpType($aCol);
@@ -1300,7 +1302,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         
     /**
      * @param ' . $sType . ' $' . $sAttrName . ' Maxlenght:' . $this->getMaxLength($aCol) . '
-     * @return $this
+     * @return '.$sClassName.'
      * @throw \InvalidArgumentException
      * @author ' . __CLASS__ . '
      */
@@ -1321,6 +1323,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
 
     public function genSetterForeignKey( $sTable, array $aCol )
     {
+        $sClassName = $this->formatPhpClassName($sTable);
+        
         $aFK = $this->aForeignKeys[ $sTable ][ $aCol['Field'] ];
 
         $sObjAttrName = $this->formatPhpForeignAttrName($aFK['COLUMN_NAME']);
@@ -1338,6 +1342,7 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         
     /**
      * @param ' . $sType . ' $' . $sObjAttrName . '
+     * @return '.$sClassName.'
      * @author ' . __CLASS__ . '
      */
     public function set' . $sObjFuncName . '(' . $sType . ' $' . $sObjAttrName . ' )
