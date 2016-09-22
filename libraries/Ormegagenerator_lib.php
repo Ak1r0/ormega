@@ -1142,7 +1142,8 @@ class ' . $sClassName . ' implements \Ormega\EntityInterface {
         
         foreach ( $this->aForeignKeys[ $sTable ] as $sKeyName => $aKey ) {
             $php .= '
-        $this->'.$this->formatPhpForeignAttrName($aKey['COLUMN_NAME'])
+        if( $this->'.$this->formatPhpForeignAttrName($aKey['COLUMN_NAME']).' ) 
+            $this->'.$this->formatPhpForeignAttrName($aKey['COLUMN_NAME'])
                 .' = clone $this->'.$this->formatPhpForeignAttrName($aKey['COLUMN_NAME']).';';
         }
         
