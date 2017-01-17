@@ -1888,6 +1888,7 @@ class ' . $sClassName . ' implements \Ormega\QueryInterface {
             case 'int':
             case 'bigint':
             case 'bit':
+            case 'year':
                 $sType = 'int';
                 break;
             case 'float':
