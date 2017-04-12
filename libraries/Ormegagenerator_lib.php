@@ -392,23 +392,14 @@ class Orm {
             $aPaths = explode("\\\", $class);
 
             if( isset($aPaths[0]) && $aPaths[0] == __NAMESPACE__ ) {
-
-                $basepath = __DIR__."/";
-                if( isset($aPaths[1]) && isset( $aDb[ $aPaths[1] ] ) ) {
-                    $basepath = $basepath.$aPaths[1]."/";
-    
-                    if( isset($aPaths[2]) && is_dir($basepath.$aPaths[2]) ){
-                        $basepath = $basepath.$aPaths[2]."/";
-    
-                        if( isset($aPaths[3]) && is_dir($basepath.$aPaths[3]) ){
-                            $basepath = $basepath.$aPaths[3]."/";
-                        }
+                
+                $filePath = end($aPaths).".php";
+                while($sPathPart = prev($aPaths)){
+                    if( $sPathPart != __NAMESPACE__ ){
+                        $filePath = $sPathPart . "/" . $filePath;
                     }
                 }
-                
-                if( is_file($basepath.end($aPaths).".php") ){
-                    require_once $basepath.end($aPaths).".php";
-                }
+                require_once __DIR__."/".$filePath;
             }
         });
         
